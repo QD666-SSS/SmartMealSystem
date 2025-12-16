@@ -1,4 +1,4 @@
-﻿#include "../include/Database.h"
+#include "../include/Database.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -64,7 +64,7 @@ bool Database::loadFoods() {
                 Food food(id, name, calories, protein, carbs, fat, fiber, tags, category);
                 foods.push_back(food);
             } catch (const std::exception& e) {
-                std::cout << "Error parsing food line: " << line << std::endl;
+                std::cout << "Error parsing food line: " << line << " - " << e.what() << std::endl;
             }
         }
     }
@@ -141,7 +141,7 @@ bool Database::loadUsers() {
                 
                 users.push_back(user);
             } catch (const std::exception& e) {
-                std::cout << "Error parsing user line: " << line << std::endl;
+                std::cout << "Error parsing user line: " << line << " - " << e.what() << std::endl;
             }
         }
     }
@@ -225,7 +225,7 @@ bool Database::loadMeals() {
                 
                 meals.push_back(meal);
             } catch (const std::exception& e) {
-                std::cout << "Error parsing meal line: " << line << std::endl;
+                std::cout << "Error parsing meal line: " << line << " - " << e.what() << std::endl;
             }
         }
     }
