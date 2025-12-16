@@ -1,4 +1,4 @@
-﻿#include "../include/User.h"
+#include "../include/User.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -49,49 +49,49 @@ void User::calculateNutritionGoals() {
 }
 
 void User::displayProfile() const {
-    std::cout << "\n===============================================" << std::endl;
-    std::cout << "              用户资料                         " << std::endl;
-    std::cout << "===============================================" << std::endl;
-    std::cout << "  用户名: " << std::left << std::setw(44) << username << std::endl;
-    std::cout << "  年龄:   " << std::left << std::setw(44) << age << std::endl;
-    std::cout << "  性别:   " << std::left << std::setw(44) << gender << std::endl;
-    std::cout << "  体重:   " << std::left << std::setw(44) << (std::to_string((int)weight) + " kg") << std::endl;
-    std::cout << "  身高:   " << std::left << std::setw(44) << (std::to_string((int)height) + " cm") << std::endl;
-    std::cout << "  活动水平: " << std::left << std::setw(42) << activityLevel << std::endl;
-    std::cout << "===============================================" << std::endl;
-    std::cout << "  每日营养目标:                                  " << std::endl;
-    std::cout << "    热量:     " << std::left << std::setw(39) << (std::to_string((int)dailyCalorieGoal) + " kcal") << std::endl;
-    std::cout << "    蛋白质:   " << std::left << std::setw(39) << (std::to_string((int)dailyProteinGoal) + " g") << std::endl;
-    std::cout << "    碳水化合物: " << std::left << std::setw(37) << (std::to_string((int)dailyCarbGoal) + " g") << std::endl;
-    std::cout << "    脂肪:     " << std::left << std::setw(39) << (std::to_string((int)dailyFatGoal) + " g") << std::endl;
-    
-    if (!preferredTags.empty()) {
-        std::cout << "===============================================" << std::endl;
-        std::cout << "  喜欢的口味: ";
-        std::stringstream ss;
-        bool first = true;
-        for (const auto& tag : preferredTags) {
-            if (!first) ss << ", ";
-            ss << tag;
-            first = false;
-        }
-        std::cout << std::left << std::setw(38) << ss.str() << std::endl;
-    }
-    
-    if (!avoidedTags.empty()) {
-        std::cout << "  避免的口味: ";
-        std::stringstream ss;
-        bool first = true;
-        for (const auto& tag : avoidedTags) {
-            if (!first) ss << ", ";
-            ss << tag;
-            first = false;
-        }
-        std::cout << std::left << std::setw(38) << ss.str() << std::endl;
-    }
-    
-    std::cout << "===============================================" << std::endl;
-}
+     std::cout << "\n===============================================" << std::endl;
+     std::cout << u8"              用户资料                         " << std::endl;
+     std::cout << "===============================================" << std::endl;
+     std::cout << u8"  用户名: " << std::left << std::setw(44) << username << std::endl;
+     std::cout << u8"  年龄:   " << std::left << std::setw(44) << age << std::endl;
+     std::cout << u8"  性别:   " << std::left << std::setw(44) << gender << std::endl;
+     std::cout << u8"  体重:   " << std::left << std::setw(44) << (std::to_string((int)weight) + u8" kg") << std::endl;
+     std::cout << u8"  身高:   " << std::left << std::setw(44) << (std::to_string((int)height) + u8" cm") << std::endl;
+     std::cout << u8"  活动水平: " << std::left << std::setw(42) << activityLevel << std::endl;
+     std::cout << "===============================================" << std::endl;
+     std::cout << u8"  每日营养目标:                                  " << std::endl;
+     std::cout << u8"    热量:     " << std::left << std::setw(39) << (std::to_string((int)dailyCalorieGoal) + u8" kcal") << std::endl;
+     std::cout << u8"    蛋白质:   " << std::left << std::setw(39) << (std::to_string((int)dailyProteinGoal) + u8" g") << std::endl;
+     std::cout << u8"    碳水化合物: " << std::left << std::setw(37) << (std::to_string((int)dailyCarbGoal) + u8" g") << std::endl;
+     std::cout << u8"    脂肪:     " << std::left << std::setw(39) << (std::to_string((int)dailyFatGoal) + u8" g") << std::endl;
+
+     if (!preferredTags.empty()) {
+         std::cout << "===============================================" << std::endl;
+         std::cout << u8"  喜欢的口味: ";
+         std::stringstream ss;
+         bool first = true;
+         for (const auto& tag : preferredTags) {
+             if (!first) ss << u8", ";
+             ss << tag;
+             first = false;
+         }
+         std::cout << std::left << std::setw(38) << ss.str() << std::endl;
+     }
+
+     if (!avoidedTags.empty()) {
+         std::cout << u8"  避免的口味: ";
+         std::stringstream ss;
+         bool first = true;
+         for (const auto& tag : avoidedTags) {
+             if (!first) ss << u8", ";
+             ss << tag;
+             first = false;
+         }
+         std::cout << std::left << std::setw(38) << ss.str() << std::endl;
+     }
+
+     std::cout << "===============================================" << std::endl;
+ }
 
 std::string User::toString() const {
     std::stringstream ss;
