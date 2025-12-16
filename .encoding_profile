@@ -1,0 +1,11 @@
+# 智能配餐推荐系统 - 编码环境配置
+export LANG=C.utf8
+export LC_ALL=C.utf8
+export TERM=xterm-256color
+
+# 验证编码
+if locale 2>/dev/null | grep -q "LC_CTYPE"; then
+    echo "编码环境: $LANG ✅"
+else
+    echo "警告: 编码环境设置可能不完整 ⚠️"
+fi
