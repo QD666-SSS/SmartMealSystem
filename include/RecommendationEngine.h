@@ -1,4 +1,4 @@
-#ifndef RECOMMENDATION_ENGINE_H
+﻿#ifndef RECOMMENDATION_ENGINE_H
 #define RECOMMENDATION_ENGINE_H
 
 #include "User.h"

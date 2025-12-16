@@ -1,4 +1,4 @@
-#ifndef MEAL_H
+﻿#ifndef MEAL_H
 #define MEAL_H
 
 #include "Food.h"
