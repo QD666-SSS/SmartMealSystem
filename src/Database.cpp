@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iostream>
 #include <algorithm>
+#include <optional>
 
 Database::Database() : usersFile("data/users.txt"), 
                        foodsFile("data/foods.txt"),
@@ -34,67 +35,6 @@ std::set<std::string> Database::parseTagString(const std::string& tagStr) const 
     return tags;
 }
 
-std::string Database::tagsToString(const std::set<std::string>& tags) const {
-    std::stringstream ss;
-    bool first = true;
-    for (const auto& tag : tags) {
-        if (!first) ss << ",";
-        ss << tag;
-        first = false;
-    }
-    return ss.str();
-}
-
-bool Database::loadUsers() {
-    std::ifstream file(usersFile);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    users.clear();
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-        
-        auto parts = split(line, '|');
-        if (parts.size() >= 15) {
-            User user;
-            user.setId(std::stoi(parts[0]));
-            user.setUsername(parts[1]);
-            user.setPassword(parts[2]);
-            user.setAge(std::stoi(parts[3]));
-            user.setWeight(std::stod(parts[4]));
-            user.setHeight(std::stod(parts[5]));
-            user.setGender(parts[6]);
-            user.setActivityLevel(parts[7]);
-            user.setDailyCalorieGoal(std::stod(parts[8]));
-            user.setDailyProteinGoal(std::stod(parts[9]));
-            user.setDailyCarbGoal(std::stod(parts[10]));
-            user.setDailyFatGoal(std::stod(parts[11]));
-            
-            auto preferredTags = parseTagString(parts[12]);
-            for (const auto& tag : preferredTags) {
-                user.addPreferredTag(tag);
-            }
-            
-            auto avoidedTags = parseTagString(parts[13]);
-            for (const auto& tag : avoidedTags) {
-                user.addAvoidedTag(tag);
-            }
-            
-            auto allergens = parseTagString(parts[14]);
-            for (const auto& allergen : allergens) {
-                user.addAllergen(allergen);
-            }
-            
-            users.push_back(user);
-        }
-    }
-    
-    file.close();
-    return true;
-}
-
 bool Database::loadFoods() {
     std::ifstream file(foodsFile);
     if (!file.is_open()) {
@@ -106,79 +46,31 @@ bool Database::loadFoods() {
     while (std::getline(file, line)) {
         if (line.empty()) continue;
         
-        auto parts = split(line, '|');
-        if (parts.size() >= 9) {
-            Food food;
-            food.setId(std::stoi(parts[0]));
-            food.setName(parts[1]);
-            food.setCalories(std::stod(parts[2]));
-            food.setProtein(std::stod(parts[3]));
-            food.setCarbohydrates(std::stod(parts[4]));
-            food.setFat(std::stod(parts[5]));
-            food.setFiber(std::stod(parts[6]));
-            food.setTags(parseTagString(parts[7]));
-            food.setCategory(parts[8]);
-            
-            foods.push_back(food);
-        }
-    }
-    
-    file.close();
-    return true;
-}
-
-bool Database::loadMeals() {
-    std::ifstream file(mealsFile);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    mealHistory.clear();
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-        
-        auto parts = split(line, '|');
-        if (parts.size() >= 10) {
-            Meal meal;
-            meal.setId(std::stoi(parts[0]));
-            int userId = std::stoi(parts[1]);
-            meal.setUserId(userId);
-            meal.setDate(parts[2]);
-            meal.setMealType(parts[3]);
-            meal.setIsRecommended(parts[8] == "1");
-            
-            auto foodIds = split(parts[9], ',');
-            for (const auto& foodIdStr : foodIds) {
-                if (!foodIdStr.empty()) {
-                    int foodId = std::stoi(foodIdStr);
-                    Food* food = findFoodById(foodId);
-                    if (food) {
-                        meal.addFood(*food);
-                    }
-                }
+        auto tokens = split(line, '|');
+        if (tokens.size() >= 9) {
+            try {
+                int id = std::stoi(tokens[0]);
+                std::string name = tokens[1];
+                double calories = std::stod(tokens[2]);
+                double protein = std::stod(tokens[3]);
+                double carbs = std::stod(tokens[4]);
+                double fat = std::stod(tokens[5]);
+                double fiber = std::stod(tokens[6]);
+                std::string tagsStr = tokens[7];
+                std::string category = tokens[8];
+                
+                auto tags = parseTagString(tagsStr);
+                
+                Food food(id, name, calories, protein, carbs, fat, fiber, tags, category);
+                foods.push_back(food);
+            } catch (const std::exception& e) {
+                std::cout << "Error parsing food line: " << line << std::endl;
             }
-            
-            mealHistory[userId].push_back(meal);
         }
     }
     
     file.close();
-    return true;
-}
-
-bool Database::saveUsers() {
-    std::ofstream file(usersFile);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& user : users) {
-        file << user.toString() << std::endl;
-    }
-    
-    file.close();
-    return true;
+    return !foods.empty();
 }
 
 bool Database::saveFoods() {
@@ -195,15 +87,62 @@ bool Database::saveFoods() {
     return true;
 }
 
-bool Database::saveMeals() {
-    std::ofstream file(mealsFile);
+bool Database::loadUsers() {
+    std::ifstream file(usersFile);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& pair : mealHistory) {
-        for (const auto& meal : pair.second) {
-            file << meal.toString() << std::endl;
+    users.clear();
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        
+        auto tokens = split(line, '|');
+        if (tokens.size() >= 12) {
+            try {
+                int id = std::stoi(tokens[0]);
+                std::string username = tokens[1];
+                std::string password = tokens[2];
+                int age = std::stoi(tokens[3]);
+                double weight = std::stod(tokens[4]);
+                double height = std::stod(tokens[5]);
+                std::string gender = tokens[6];
+                std::string activityLevel = tokens[7];
+                double dailyCalorieGoal = std::stod(tokens[8]);
+                double dailyProteinGoal = std::stod(tokens[9]);
+                double dailyCarbGoal = std::stod(tokens[10]);
+                double dailyFatGoal = std::stod(tokens[11]);
+                
+                auto preferredTags = parseTagString(tokens[12]);
+                auto avoidedTags = parseTagString(tokens[13]);
+                auto allergens = parseTagString(tokens[14]);
+                
+                User user(id, username, password);
+                user.setAge(age);
+                user.setWeight(weight);
+                user.setHeight(height);
+                user.setGender(gender);
+                user.setActivityLevel(activityLevel);
+                user.setDailyCalorieGoal(dailyCalorieGoal);
+                user.setDailyProteinGoal(dailyProteinGoal);
+                user.setDailyCarbGoal(dailyCarbGoal);
+                user.setDailyFatGoal(dailyFatGoal);
+                
+                for (const auto& tag : preferredTags) {
+                    user.addPreferredTag(tag);
+                }
+                for (const auto& tag : avoidedTags) {
+                    user.addAvoidedTag(tag);
+                }
+                for (const auto& allergen : allergens) {
+                    user.addAllergen(allergen);
+                }
+                
+                users.push_back(user);
+            } catch (const std::exception& e) {
+                std::cout << "Error parsing user line: " << line << std::endl;
+            }
         }
     }
     
@@ -211,116 +150,166 @@ bool Database::saveMeals() {
     return true;
 }
 
-bool Database::addUser(const User& user) {
-    for (const auto& u : users) {
-        if (u.getUsername() == user.getUsername()) {
-            return false;
+bool Database::saveUser(const User& user) {
+    // 检查用户是否已存在
+    for (size_t i = 0; i < users.size(); ++i) {
+        if (users[i].getId() == user.getId()) {
+            users[i] = user;
+            return saveUsers();
         }
     }
+    
+    // 添加新用户
     users.push_back(user);
     return saveUsers();
 }
 
 bool Database::updateUser(const User& user) {
-    for (auto& u : users) {
-        if (u.getId() == user.getId()) {
-            u = user;
-            return saveUsers();
-        }
-    }
-    return false;
+    return saveUser(user);
 }
 
-User* Database::findUserByUsername(const std::string& username) {
-    for (auto& user : users) {
-        if (user.getUsername() == username) {
-            return &user;
-        }
+bool Database::saveUsers() {
+    std::ofstream file(usersFile);
+    if (!file.is_open()) {
+        return false;
     }
-    return nullptr;
+    
+    for (const auto& user : users) {
+        file << user.toString() << std::endl;
+    }
+    
+    file.close();
+    return true;
 }
 
-User* Database::findUserById(int id) {
-    for (auto& user : users) {
-        if (user.getId() == id) {
-            return &user;
+bool Database::loadMeals() {
+    std::ifstream file(mealsFile);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    meals.clear();
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        
+        auto tokens = split(line, '|');
+        if (tokens.size() >= 10) {
+            try {
+                int id = std::stoi(tokens[0]);
+                int userId = std::stoi(tokens[1]);
+                std::string date = tokens[2];
+                std::string mealType = tokens[3];
+                double totalCalories = std::stod(tokens[4]);
+                double totalProtein = std::stod(tokens[5]);
+                double totalCarbs = std::stod(tokens[6]);
+                double totalFat = std::stod(tokens[7]);
+                bool isRecommended = (tokens[8] == "1");
+                
+                Meal meal(id, userId, date, mealType);
+                meal.setIsRecommended(isRecommended);
+                
+                // 解析食物ID列表
+                if (tokens.size() > 9) {
+                    auto foodIds = split(tokens[9], ',');
+                    for (const auto& foodIdStr : foodIds) {
+                        if (!foodIdStr.empty()) {
+                            int foodId = std::stoi(foodIdStr);
+                            auto food = getFoodById(foodId);
+                            if (food) {
+                                meal.addFood(*food);
+                            }
+                        }
+                    }
+                }
+                
+                meals.push_back(meal);
+            } catch (const std::exception& e) {
+                std::cout << "Error parsing meal line: " << line << std::endl;
+            }
         }
     }
-    return nullptr;
+    
+    file.close();
+    return true;
 }
 
-bool Database::addFood(const Food& food) {
-    foods.push_back(food);
-    return saveFoods();
-}
-
-bool Database::updateFood(const Food& food) {
-    for (auto& f : foods) {
-        if (f.getId() == food.getId()) {
-            f = food;
-            return saveFoods();
+bool Database::saveMeal(const Meal& meal) {
+    // 检查餐单是否已存在
+    for (size_t i = 0; i < meals.size(); ++i) {
+        if (meals[i].getId() == meal.getId()) {
+            meals[i] = meal;
+            return saveMeals();
         }
     }
-    return false;
+    
+    // 添加新餐单
+    meals.push_back(meal);
+    return saveMeals();
 }
 
-Food* Database::findFoodById(int id) {
-    for (auto& food : foods) {
-        if (food.getId() == id) {
-            return &food;
-        }
+bool Database::saveMeals() {
+    std::ofstream file(mealsFile);
+    if (!file.is_open()) {
+        return false;
     }
-    return nullptr;
+    
+    for (const auto& meal : meals) {
+        file << meal.toString() << std::endl;
+    }
+    
+    file.close();
+    return true;
 }
 
 std::vector<Food> Database::getAllFoods() const {
     return foods;
 }
 
-std::vector<Food> Database::searchFoodsByName(const std::string& keyword) const {
-    std::vector<Food> results;
-    for (const auto& food : foods) {
-        if (food.getName().find(keyword) != std::string::npos) {
-            results.push_back(food);
-        }
-    }
-    return results;
+std::vector<User> Database::getAllUsers() const {
+    return users;
 }
 
-bool Database::addMeal(const Meal& meal) {
-    mealHistory[meal.getUserId()].push_back(meal);
-    return saveMeals();
+std::vector<Meal> Database::getAllMeals() const {
+    return meals;
 }
 
-std::vector<Meal> Database::getUserMeals(int userId) const {
-    auto it = mealHistory.find(userId);
-    if (it != mealHistory.end()) {
-        return it->second;
-    }
-    return std::vector<Meal>();
-}
-
-std::vector<Meal> Database::getUserMealsByDate(int userId, const std::string& date) const {
+std::vector<Meal> Database::getMealsByUser(int userId) const {
     std::vector<Meal> result;
-    auto it = mealHistory.find(userId);
-    if (it != mealHistory.end()) {
-        for (const auto& meal : it->second) {
-            if (meal.getDate() == date) {
-                result.push_back(meal);
-            }
+    for (const auto& meal : meals) {
+        if (meal.getUserId() == userId) {
+            result.push_back(meal);
         }
     }
     return result;
 }
 
-int Database::getNextUserId() const {
-    int maxId = 0;
-    for (const auto& user : users) {
-        if (user.getId() > maxId) {
-            maxId = user.getId();
+std::vector<Meal> Database::getMealsByDate(const std::string& date) const {
+    std::vector<Meal> result;
+    for (const auto& meal : meals) {
+        if (meal.getDate() == date) {
+            result.push_back(meal);
         }
     }
-    return maxId + 1;
+    return result;
+}
+
+std::optional<Food> Database::getFoodById(int id) const {
+    for (const auto& food : foods) {
+        if (food.getId() == id) {
+            return food;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<User> Database::getUserById(int id) const {
+    for (const auto& user : users) {
+        if (user.getId() == id) {
+            return user;
+        }
+    }
+    return std::nullopt;
 }
 
 int Database::getNextFoodId() const {
@@ -333,13 +322,21 @@ int Database::getNextFoodId() const {
     return maxId + 1;
 }
 
+int Database::getNextUserId() const {
+    int maxId = 0;
+    for (const auto& user : users) {
+        if (user.getId() > maxId) {
+            maxId = user.getId();
+        }
+    }
+    return maxId + 1;
+}
+
 int Database::getNextMealId() const {
     int maxId = 0;
-    for (const auto& pair : mealHistory) {
-        for (const auto& meal : pair.second) {
-            if (meal.getId() > maxId) {
-                maxId = meal.getId();
-            }
+    for (const auto& meal : meals) {
+        if (meal.getId() > maxId) {
+            maxId = meal.getId();
         }
     }
     return maxId + 1;
@@ -369,19 +366,17 @@ void Database::initializeSampleData() {
     foods.push_back(Food(15, "鸡蛋", 147, 12.6, 1.3, 10.6, 0.0, {"清淡"}, "蛋类"));
     foods.push_back(Food(16, "鸭蛋", 180, 12.6, 3.1, 13.0, 0.0, {"咸"}, "蛋类"));
     
-    foods.push_back(Food(17, "苹果", 52, 0.3, 13.8, 0.2, 2.4, {"甜"}, "水果"));
+    foods.push_back(Food(17, "苹果", 52, 0.3, 13.8, 0.2, 2.4, {"甜", "酸"}, "水果"));
     foods.push_back(Food(18, "香蕉", 89, 1.1, 22.8, 0.3, 2.6, {"甜"}, "水果"));
-    foods.push_back(Food(19, "橙子", 47, 0.9, 11.8, 0.1, 2.4, {"酸","甜"}, "水果"));
+    foods.push_back(Food(19, "橙子", 47, 0.9, 11.8, 0.1, 2.4, {"酸", "甜"}, "水果"));
+    foods.push_back(Food(20, "葡萄", 62, 0.6, 15.9, 0.2, 0.9, {"甜"}, "水果"));
     
-    foods.push_back(Food(20, "核桃", 654, 15.2, 13.7, 65.2, 6.7, {"香"}, "坚果"));
-    foods.push_back(Food(21, "杏仁", 578, 21.3, 21.7, 50.6, 12.2, {"香"}, "坚果"));
+    foods.push_back(Food(21, "牛奶", 42, 3.4, 5.0, 1.0, 0.0, {"清淡"}, "奶制品"));
+    foods.push_back(Food(22, "酸奶", 59, 10.0, 3.6, 0.4, 0.0, {"酸", "甜"}, "奶制品"));
+    foods.push_back(Food(23, "奶酪", 113, 7.0, 1.0, 9.0, 0.0, {"清淡"}, "奶制品"));
     
-    foods.push_back(Food(22, "牛奶", 54, 3.0, 3.4, 3.2, 0.0, {"清淡"}, "饮品"));
-    foods.push_back(Food(23, "酸奶", 72, 2.5, 9.3, 2.7, 0.0, {"酸","甜"}, "饮品"));
-    
-    foods.push_back(Food(24, "紫菜蛋花汤", 35, 3.2, 2.1, 1.8, 0.5, {"鲜"}, "汤"));
-    foods.push_back(Food(25, "番茄蛋汤", 45, 3.5, 3.2, 2.3, 0.8, {"酸","鲜"}, "汤"));
+    foods.push_back(Food(24, "核桃", 654, 15.2, 13.7, 65.2, 6.7, {"香"}, "坚果"));
+    foods.push_back(Food(25, "花生", 567, 25.8, 16.1, 49.2, 8.5, {"香"}, "坚果"));
     
     saveFoods();
-    std::cout << "已初始化 " << foods.size() << " 种食物数据。" << std::endl;
 }

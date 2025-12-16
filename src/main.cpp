@@ -49,24 +49,24 @@ public:
 private:
     void showWelcome() {
         Utils::clearScreen();
-        std::cout << "╔══════════════════════════════════════════════════════╗" << std::endl;
-        std::cout << "║                                                        ║" << std::endl;
-        std::cout << "║          智能配餐推荐系统 v1.0                         ║" << std::endl;
-        std::cout << "║                                                        ║" << std::endl;
-        std::cout << "║     Intelligent Meal Recommendation System             ║" << std::endl;
-        std::cout << "║                                                        ║" << std::endl;
-        std::cout << "╚══════════════════════════════════════════════════════╝" << std::endl;
+        std::cout << "============================================" << std::endl;
+        std::cout << "                                      " << std::endl;
+        std::cout << "          智能配餐推荐系统 v1.0             " << std::endl;
+        std::cout << "                                      " << std::endl;
+        std::cout << "     Intelligent Meal Recommendation System " << std::endl;
+        std::cout << "                                      " << std::endl;
+        std::cout << "============================================" << std::endl;
         std::cout << std::endl;
     }
 
     bool loginMenu() {
-        std::cout << "\n╔══════════════════════════════════════╗" << std::endl;
-        std::cout << "║         欢迎使用                       ║" << std::endl;
-        std::cout << "╠══════════════════════════════════════╣" << std::endl;
-        std::cout << "║  1. 用户登录                          ║" << std::endl;
-        std::cout << "║  2. 用户注册                          ║" << std::endl;
-        std::cout << "║  0. 退出系统                          ║" << std::endl;
-        std::cout << "╚══════════════════════════════════════╝" << std::endl;
+        std::cout << "\n=================================" << std::endl;
+        std::cout << "         欢迎使用                   " << std::endl;
+        std::cout << "=================================" << std::endl;
+        std::cout << "  1. 用户登录                      " << std::endl;
+        std::cout << "  2. 用户注册                      " << std::endl;
+        std::cout << "  0. 退出系统                      " << std::endl;
+        std::cout << "=================================" << std::endl;
         
         int choice = Utils::getIntInput("\n请选择 (0-2): ");
         
@@ -80,508 +80,427 @@ private:
             case 0:
                 return false;
             default:
-                std::cout << "无效选择！" << std::endl;
-                Utils::pause();
+                std::cout << "无效选择，请重试。" << std::endl;
         }
-        
         return true;
     }
 
     void login() {
-        Utils::clearScreen();
-        std::cout << "\n═══════ 用户登录 ═══════" << std::endl;
+        std::cout << "\n=== 用户登录 ===" << std::endl;
+        std::string username = Utils::getStringInput("请输入用户名: ");
+        std::string password = Utils::getStringInput("请输入密码: ");
         
-        std::string username = Utils::getInput("用户名: ");
-        std::string password = Utils::getInput("密码: ");
-        
-        User* user = db.findUserByUsername(username);
-        if (user != nullptr && user->getPassword() == password) {
-            currentUser = user;
-            std::cout << "\n登录成功！欢迎, " << username << "!" << std::endl;
-            Utils::pause();
-        } else {
-            std::cout << "\n用户名或密码错误！" << std::endl;
-            Utils::pause();
+        auto users = db.getAllUsers();
+        for (auto& user : users) {
+            if (user.getUsername() == username && user.getPassword() == password) {
+                currentUser = &user;
+                std::cout << "\n登录成功！" << std::endl;
+                return;
+            }
         }
+        
+        std::cout << "\n用户名或密码错误！" << std::endl;
     }
 
     void registerUser() {
-        Utils::clearScreen();
-        std::cout << "\n═══════ 用户注册 ═══════" << std::endl;
+        std::cout << "\n=== 用户注册 ===" << std::endl;
         
-        std::string username = Utils::getInput("请输入用户名: ");
-        
-        if (db.findUserByUsername(username) != nullptr) {
-            std::cout << "\n用户名已存在！" << std::endl;
-            Utils::pause();
-            return;
+        std::string username;
+        while (true) {
+            username = Utils::getStringInput("请输入用户名: ");
+            if (username.empty()) {
+                std::cout << "用户名不能为空！" << std::endl;
+                continue;
+            }
+            
+            auto users = db.getAllUsers();
+            bool exists = false;
+            for (const auto& user : users) {
+                if (user.getUsername() == username) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (exists) {
+                std::cout << "用户名已存在，请选择其他用户名！" << std::endl;
+            } else {
+                break;
+            }
         }
         
-        std::string password = Utils::getInput("请输入密码: ");
+        std::string password = Utils::getStringInput("请输入密码: ");
         
-        User newUser(db.getNextUserId(), username, password);
+        int newId = db.getNextUserId();
+        User newUser(newId, username, password);
         
+        // 设置基本信息
+        std::cout << "\n=== 设置基本信息 ===" << std::endl;
         newUser.setAge(Utils::getIntInput("请输入年龄: "));
-        newUser.setWeight(Utils::getDoubleInput("请输入体重 (kg): "));
-        newUser.setHeight(Utils::getDoubleInput("请输入身高 (cm): "));
+        newUser.setWeight(Utils::getDoubleInput("请输入体重(kg): "));
+        newUser.setHeight(Utils::getDoubleInput("请输入身高(cm): "));
         
-        std::cout << "\n性别 (1.男 2.女): ";
-        int genderChoice = Utils::getIntInput("");
+        std::cout << "请选择性别: " << std::endl;
+        std::cout << "1. 男性" << std::endl;
+        std::cout << "2. 女性" << std::endl;
+        int genderChoice = Utils::getIntInput("选择 (1-2): ");
         newUser.setGender(genderChoice == 1 ? "male" : "female");
         
-        std::cout << "\n活动水平:" << std::endl;
-        std::cout << "1. 久坐 (sedentary)" << std::endl;
-        std::cout << "2. 轻度活动 (light)" << std::endl;
-        std::cout << "3. 中度活动 (moderate)" << std::endl;
-        std::cout << "4. 重度活动 (active)" << std::endl;
-        std::cout << "5. 非常活跃 (very_active)" << std::endl;
-        int activityChoice = Utils::getIntInput("请选择 (1-5): ");
+        std::cout << "\n请选择活动水平: " << std::endl;
+        std::cout << "1. 久坐 (很少运动)" << std::endl;
+        std::cout << "2. 轻度活动 (轻度运动1-3天/周)" << std::endl;
+        std::cout << "3. 中度活动 (中度运动3-5天/周)" << std::endl;
+        std::cout << "4. 高强度活动 (高强度运动6-7天/周)" << std::endl;
+        std::cout << "5. 极高强度 (每天高强度运动)" << std::endl;
+        int activityChoice = Utils::getIntInput("选择 (1-5): ");
+        std::string activityLevels[] = {"sedentary", "light", "moderate", "active", "very_active"};
+        newUser.setActivityLevel(activityLevels[activityChoice - 1]);
         
-        std::string activityLevel;
-        switch (activityChoice) {
-            case 1: activityLevel = "sedentary"; break;
-            case 2: activityLevel = "light"; break;
-            case 3: activityLevel = "moderate"; break;
-            case 4: activityLevel = "active"; break;
-            case 5: activityLevel = "very_active"; break;
-            default: activityLevel = "moderate";
-        }
-        newUser.setActivityLevel(activityLevel);
-        
+        // 计算营养目标
         newUser.calculateNutritionGoals();
         
-        if (db.addUser(newUser)) {
-            std::cout << "\n注册成功！" << std::endl;
-            currentUser = db.findUserByUsername(username);
-        } else {
-            std::cout << "\n注册失败！" << std::endl;
-        }
+        db.saveUser(newUser);
         
-        Utils::pause();
+        std::cout << "\n注册成功！" << std::endl;
+        currentUser = &db.getAllUsers().back();
     }
 
     void mainMenu() {
         Utils::clearScreen();
+        std::cout << "\n=================================" << std::endl;
+        std::cout << "         主菜单                   " << std::endl;
+        std::cout << "=================================" << std::endl;
+        std::cout << "  欢迎回来，" << currentUser->getUsername() << "!" << std::endl;
+        std::cout << "=================================" << std::endl;
+        std::cout << "  1. 查看个人信息               " << std::endl;
+        std::cout << "  2. 查看食物数据库             " << std::endl;
+        std::cout << "  3. 生成餐单推荐               " << std::endl;
+        std::cout << "  4. 管理历史餐单               " << std::endl;
+        std::cout << "  5. 口味偏好管理               " << std::endl;
+        std::cout << "  6. 营养统计                   " << std::endl;
+        std::cout << "  0. 退出登录                   " << std::endl;
+        std::cout << "=================================" << std::endl;
         
-        std::cout << "\n╔══════════════════════════════════════════════════╗" << std::endl;
-        std::cout << "║          智能配餐推荐系统 - 主菜单                 ║" << std::endl;
-        std::cout << "╠══════════════════════════════════════════════════╣" << std::endl;
-        std::cout << "║  当前用户: " << std::left << std::setw(37) 
-                  << currentUser->getUsername() << "║" << std::endl;
-        std::cout << "╠══════════════════════════════════════════════════╣" << std::endl;
-        std::cout << "║  1. 获取每日配餐推荐                              ║" << std::endl;
-        std::cout << "║  2. 查看历史记录                                  ║" << std::endl;
-        std::cout << "║  3. 手动调整餐单                                  ║" << std::endl;
-        std::cout << "║  4. 食物数据库查询                                ║" << std::endl;
-        std::cout << "║  5. 营养成分可视化                                ║" << std::endl;
-        std::cout << "║  6. 个人资料管理                                  ║" << std::endl;
-        std::cout << "║  7. 口味偏好设置                                  ║" << std::endl;
-        std::cout << "║  0. 退出登录                                      ║" << std::endl;
-        std::cout << "╚══════════════════════════════════════════════════╝" << std::endl;
-        
-        int choice = Utils::getIntInput("\n请选择 (0-7): ");
+        int choice = Utils::getIntInput("\n请选择 (0-6): ");
         
         switch (choice) {
             case 1:
-                getDailyRecommendation();
+                showUserProfile();
                 break;
             case 2:
-                viewHistory();
+                showFoodDatabase();
                 break;
             case 3:
-                adjustMeal();
+                generateMealRecommendation();
                 break;
             case 4:
-                browseFoodDatabase();
+                manageMealHistory();
                 break;
             case 5:
-                visualizeNutrition();
+                managePreferences();
                 break;
             case 6:
-                manageProfile();
-                break;
-            case 7:
-                managePreferences();
+                showNutritionStats();
                 break;
             case 0:
                 currentUser = nullptr;
-                std::cout << "\n已退出登录。" << std::endl;
-                Utils::pause();
-                break;
+                return;
             default:
-                std::cout << "无效选择！" << std::endl;
-                Utils::pause();
-        }
-    }
-
-    void getDailyRecommendation() {
-        Utils::clearScreen();
-        std::cout << "\n═══════ 每日配餐推荐 ═══════" << std::endl;
-        
-        std::string date = Utils::getCurrentDate();
-        std::cout << "\n推荐日期: " << date << std::endl;
-        
-        std::cout << "\n正在生成推荐餐单..." << std::endl;
-        
-        std::vector<Meal> recommendedMeals = engine.recommendDailyMeals(*currentUser, date);
-        
-        std::cout << "\n╔══════════════════════════════════════════════════╗" << std::endl;
-        std::cout << "║             今日推荐餐单                           ║" << std::endl;
-        std::cout << "╚══════════════════════════════════════════════════╝" << std::endl;
-        
-        double totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0;
-        
-        for (auto& meal : recommendedMeals) {
-            meal.setId(db.getNextMealId());
-            meal.setUserId(currentUser->getId());
-            meal.displayMeal();
-            
-            totalCalories += meal.getTotalCalories();
-            totalProtein += meal.getTotalProtein();
-            totalCarbs += meal.getTotalCarbs();
-            totalFat += meal.getTotalFat();
-        }
-        
-        std::cout << "\n╔══════════════════════════════════════════════════╗" << std::endl;
-        std::cout << "║              全天营养总计                          ║" << std::endl;
-        std::cout << "╠══════════════════════════════════════════════════╣" << std::endl;
-        std::cout << "║  总热量:     " << (int)totalCalories << " / " 
-                  << (int)currentUser->getDailyCalorieGoal() << " kcal" << std::endl;
-        std::cout << "║  总蛋白质:   " << (int)totalProtein << " / " 
-                  << (int)currentUser->getDailyProteinGoal() << " g" << std::endl;
-        std::cout << "║  总碳水化合物: " << (int)totalCarbs << " / " 
-                  << (int)currentUser->getDailyCarbGoal() << " g" << std::endl;
-        std::cout << "║  总脂肪:     " << (int)totalFat << " / " 
-                  << (int)currentUser->getDailyFatGoal() << " g" << std::endl;
-        std::cout << "╚══════════════════════════════════════════════════╝" << std::endl;
-        
-        std::cout << "\n是否保存此推荐餐单？(y/n): ";
-        std::string save = Utils::getInput("");
-        
-        if (save == "y" || save == "Y") {
-            for (const auto& meal : recommendedMeals) {
-                db.addMeal(meal);
-                engine.addToHistory(currentUser->getId(), meal);
-            }
-            std::cout << "已保存餐单！" << std::endl;
+                std::cout << "无效选择，请重试。" << std::endl;
         }
         
         Utils::pause();
     }
 
-    void viewHistory() {
-        Utils::clearScreen();
-        std::cout << "\n═══════ 历史记录 ═══════" << std::endl;
+    void showUserProfile() {
+        currentUser->displayProfile();
         
-        auto meals = db.getUserMeals(currentUser->getId());
+        std::cout << "\n是否需要修改资料？ (y/n): ";
+        std::string choice;
+        std::cin >> choice;
         
-        if (meals.empty()) {
-            std::cout << "\n暂无历史记录。" << std::endl;
-        } else {
-            std::cout << "\n共有 " << meals.size() << " 条记录。" << std::endl;
+        if (choice == "y" || choice == "Y") {
+            std::cout << "\n=== 修改个人信息 ===" << std::endl;
+            currentUser->setAge(Utils::getIntInput("请输入年龄: "));
+            currentUser->setWeight(Utils::getDoubleInput("请输入体重(kg): "));
+            currentUser->setHeight(Utils::getDoubleInput("请输入身高(cm): "));
             
-            std::map<std::string, std::vector<Meal>> mealsByDate;
-            for (const auto& meal : meals) {
-                mealsByDate[meal.getDate()].push_back(meal);
-            }
+            std::cout << "请选择性别: " << std::endl;
+            std::cout << "1. 男性" << std::endl;
+            std::cout << "2. 女性" << std::endl;
+            int genderChoice = Utils::getIntInput("选择 (1-2): ");
+            currentUser->setGender(genderChoice == 1 ? "male" : "female");
             
-            for (const auto& pair : mealsByDate) {
-                std::cout << "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" << std::endl;
-                std::cout << "日期: " << pair.first << std::endl;
-                std::cout << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" << std::endl;
-                
-                for (const auto& meal : pair.second) {
-                    meal.displayMeal();
-                }
-            }
+            std::cout << "\n请选择活动水平: " << std::endl;
+            std::cout << "1. 久坐 (很少运动)" << std::endl;
+            std::cout << "2. 轻度活动 (轻度运动1-3天/周)" << std::endl;
+            std::cout << "3. 中度活动 (中度运动3-5天/周)" << std::endl;
+            std::cout << "4. 高强度活动 (高强度运动6-7天/周)" << std::endl;
+            std::cout << "5. 极高强度 (每天高强度运动)" << std::endl;
+            int activityChoice = Utils::getIntInput("选择 (1-5): ");
+            std::string activityLevels[] = {"sedentary", "light", "moderate", "active", "very_active"};
+            currentUser->setActivityLevel(activityLevels[activityChoice - 1]);
             
-            engine.loadHistory({{currentUser->getId(), meals}});
-            engine.displayRecommendationStats(*currentUser);
-        }
-        
-        Utils::pause();
-    }
-
-    void adjustMeal() {
-        Utils::clearScreen();
-        std::cout << "\n═══════ 手动调整餐单 ═══════" << std::endl;
-        
-        std::cout << "\n1. 创建新餐单" << std::endl;
-        std::cout << "2. 修改已有餐单" << std::endl;
-        int choice = Utils::getIntInput("\n请选择: ");
-        
-        if (choice == 1) {
-            createCustomMeal();
-        } else if (choice == 2) {
-            std::cout << "\n功能开发中..." << std::endl;
-            Utils::pause();
+            currentUser->calculateNutritionGoals();
+            db.updateUser(*currentUser);
+            
+            std::cout << "\n资料更新成功！" << std::endl;
         }
     }
 
-    void createCustomMeal() {
-        Utils::clearScreen();
-        std::cout << "\n═══════ 创建自定义餐单 ═══════" << std::endl;
-        
-        std::string date = Utils::getInput("\n日期 (YYYY-MM-DD, 回车使用今天): ");
-        if (date.empty()) {
-            date = Utils::getCurrentDate();
-        }
-        
-        std::cout << "\n餐次类型:" << std::endl;
-        std::cout << "1. 早餐 (breakfast)" << std::endl;
-        std::cout << "2. 午餐 (lunch)" << std::endl;
-        std::cout << "3. 晚餐 (dinner)" << std::endl;
-        std::cout << "4. 加餐 (snack)" << std::endl;
-        int mealTypeChoice = Utils::getIntInput("请选择: ");
-        
-        std::string mealType;
-        switch (mealTypeChoice) {
-            case 1: mealType = "breakfast"; break;
-            case 2: mealType = "lunch"; break;
-            case 3: mealType = "dinner"; break;
-            case 4: mealType = "snack"; break;
-            default: mealType = "lunch";
-        }
-        
-        Meal customMeal(db.getNextMealId(), currentUser->getId(), date, mealType);
-        
-        while (true) {
-            std::cout << "\n当前餐单:" << std::endl;
-            customMeal.displayMeal();
-            
-            std::cout << "\n1. 添加食物" << std::endl;
-            std::cout << "2. 删除食物" << std::endl;
-            std::cout << "3. 保存并退出" << std::endl;
-            std::cout << "0. 放弃并返回" << std::endl;
-            
-            int action = Utils::getIntInput("\n请选择: ");
-            
-            if (action == 1) {
-                std::string keyword = Utils::getInput("搜索食物名称: ");
-                auto results = db.searchFoodsByName(keyword);
-                
-                if (results.empty()) {
-                    std::cout << "未找到相关食物。" << std::endl;
-                } else {
-                    std::cout << "\n搜索结果:" << std::endl;
-                    for (size_t i = 0; i < results.size(); ++i) {
-                        std::cout << (i+1) << ". " << results[i].getName() 
-                                  << " - " << results[i].getCalories() << " kcal" << std::endl;
-                    }
-                    
-                    int foodChoice = Utils::getIntInput("\n选择食物编号 (0取消): ");
-                    if (foodChoice > 0 && foodChoice <= (int)results.size()) {
-                        customMeal.addFood(results[foodChoice - 1]);
-                        std::cout << "已添加！" << std::endl;
-                    }
-                }
-            } else if (action == 2) {
-                int foodId = Utils::getIntInput("输入要删除的食物ID: ");
-                customMeal.removeFood(foodId);
-                std::cout << "已删除！" << std::endl;
-            } else if (action == 3) {
-                db.addMeal(customMeal);
-                engine.addToHistory(currentUser->getId(), customMeal);
-                std::cout << "\n餐单已保存！" << std::endl;
-                Utils::pause();
-                break;
-            } else if (action == 0) {
-                break;
-            }
-        }
-    }
-
-    void browseFoodDatabase() {
-        Utils::clearScreen();
-        std::cout << "\n═══════ 食物数据库 ═══════" << std::endl;
-        
+    void showFoodDatabase() {
         auto foods = db.getAllFoods();
         
-        std::cout << "\n1. 浏览所有食物" << std::endl;
-        std::cout << "2. 搜索食物" << std::endl;
-        std::cout << "3. 按类别浏览" << std::endl;
-        int choice = Utils::getIntInput("\n请选择: ");
+        std::cout << "\n=== 食物数据库 ===" << std::endl;
+        std::cout << "总计 " << foods.size() << " 种食物" << std::endl;
         
-        if (choice == 1) {
-            std::cout << "\n共有 " << foods.size() << " 种食物:" << std::endl;
+        while (true) {
+            std::cout << "\n选择操作: " << std::endl;
+            std::cout << "1. 浏览所有食物" << std::endl;
+            std::cout << "2. 按类别查看" << std::endl;
+            std::cout << "3. 按标签搜索" << std::endl;
+            std::cout << "0. 返回主菜单" << std::endl;
+            
+            int choice = Utils::getIntInput("选择 (0-3): ");
+            
+            switch (choice) {
+                case 1:
+                    for (const auto& food : foods) {
+                        food.displayInfo();
+                    }
+                    break;
+                case 2:
+                    showFoodsByCategory();
+                    break;
+                case 3:
+                    searchFoodsByTags();
+                    break;
+                case 0:
+                    return;
+                default:
+                    std::cout << "无效选择！" << std::endl;
+            }
+        }
+    }
+
+    void showFoodsByCategory() {
+        auto foods = db.getAllFoods();
+        std::set<std::string> categories;
+        
+        for (const auto& food : foods) {
+            categories.insert(food.getCategory());
+        }
+        
+        std::cout << "\n=== 按类别查看 ===" << std::endl;
+        std::vector<std::string> categoryList(categories.begin(), categories.end());
+        
+        for (size_t i = 0; i < categoryList.size(); ++i) {
+            std::cout << (i+1) << ". " << categoryList[i] << std::endl;
+        }
+        
+        int choice = Utils::getIntInput("选择类别 (1-" + std::to_string(categoryList.size()) + "): ");
+        
+        if (choice >= 1 && choice <= categoryList.size()) {
+            std::string selectedCategory = categoryList[choice-1];
+            std::cout << "\n=== " << selectedCategory << " ===" << std::endl;
+            
             for (const auto& food : foods) {
-                std::cout << "\nID: " << food.getId() << " - " << food.getName() 
-                          << " (" << food.getCategory() << ")" << std::endl;
-                std::cout << "  热量: " << food.getCalories() << " kcal, "
-                          << "蛋白质: " << food.getProtein() << "g, "
-                          << "碳水: " << food.getCarbohydrates() << "g, "
-                          << "脂肪: " << food.getFat() << "g" << std::endl;
-            }
-        } else if (choice == 2) {
-            std::string keyword = Utils::getInput("\n搜索关键词: ");
-            auto results = db.searchFoodsByName(keyword);
-            
-            if (results.empty()) {
-                std::cout << "未找到相关食物。" << std::endl;
-            } else {
-                for (const auto& food : results) {
-                    food.displayInfo();
-                }
-            }
-        } else if (choice == 3) {
-            std::map<std::string, std::vector<Food>> foodsByCategory;
-            for (const auto& food : foods) {
-                foodsByCategory[food.getCategory()].push_back(food);
-            }
-            
-            std::cout << "\n食物类别:" << std::endl;
-            int i = 1;
-            std::vector<std::string> categories;
-            for (const auto& pair : foodsByCategory) {
-                std::cout << i++ << ". " << pair.first 
-                          << " (" << pair.second.size() << " 种)" << std::endl;
-                categories.push_back(pair.first);
-            }
-            
-            int catChoice = Utils::getIntInput("\n选择类别: ");
-            if (catChoice > 0 && catChoice <= (int)categories.size()) {
-                std::string selectedCategory = categories[catChoice - 1];
-                std::cout << "\n" << selectedCategory << ":" << std::endl;
-                for (const auto& food : foodsByCategory[selectedCategory]) {
+                if (food.getCategory() == selectedCategory) {
                     food.displayInfo();
                 }
             }
         }
-        
-        Utils::pause();
     }
 
-    void visualizeNutrition() {
-        Utils::clearScreen();
-        std::cout << "\n═══════ 营养成分可视化 ═══════" << std::endl;
+    void searchFoodsByTags() {
+        std::cout << "\n=== 按标签搜索 ===" << std::endl;
+        std::string tag = Utils::getStringInput("请输入要搜索的标签: ");
         
-        std::cout << "\n1. 查看今日营养摄入" << std::endl;
-        std::cout << "2. 查看指定日期营养摄入" << std::endl;
-        std::cout << "3. 查看营养目标达成情况" << std::endl;
-        int choice = Utils::getIntInput("\n请选择: ");
+        auto foods = db.getAllFoods();
+        std::vector<Food> matchingFoods;
         
-        std::string date;
-        if (choice == 1) {
-            date = Utils::getCurrentDate();
-        } else if (choice == 2) {
-            date = Utils::getInput("请输入日期 (YYYY-MM-DD): ");
-        } else if (choice == 3) {
-            displayNutritionGoals();
-            Utils::pause();
+        for (const auto& food : foods) {
+            if (food.hasTag(tag)) {
+                matchingFoods.push_back(food);
+            }
+        }
+        
+        if (matchingFoods.empty()) {
+            std::cout << "未找到包含该标签的食物。" << std::endl;
+        } else {
+            std::cout << "\n找到 " << matchingFoods.size() << " 种匹配的食物:" << std::endl;
+            for (const auto& food : matchingFoods) {
+                food.displayInfo();
+            }
+        }
+    }
+
+    void generateMealRecommendation() {
+        std::cout << "\n=== 生成餐单推荐 ===" << std::endl;
+        
+        std::string date = Utils::getStringInput("请输入日期 (格式: YYYY-MM-DD): ");
+        
+        auto recommendation = engine.recommendDailyMeals(*currentUser, date);
+        
+        std::cout << "\n推荐餐单已生成！" << std::endl;
+        std::cout << "是否保存此推荐？ (y/n): ";
+        std::string saveChoice;
+        std::cin >> saveChoice;
+        
+        if (saveChoice == "y" || saveChoice == "Y") {
+            for (auto& meal : recommendation) {
+                meal.setUserId(currentUser->getId());
+                db.saveMeal(meal);
+            }
+            std::cout << "推荐餐单已保存！" << std::endl;
+        }
+        
+        engine.displayRecommendationStats(recommendation);
+    }
+
+    void manageMealHistory() {
+        auto meals = db.getMealsByUser(currentUser->getId());
+        
+        if (meals.empty()) {
+            std::cout << "\n暂无历史餐单记录。" << std::endl;
             return;
         }
         
-        auto meals = db.getUserMealsByDate(currentUser->getId(), date);
+        std::cout << "\n=== 历史餐单管理 ===" << std::endl;
         
-        if (meals.empty()) {
-            std::cout << "\n该日期暂无记录。" << std::endl;
-        } else {
-            double totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0;
-            
-            for (const auto& meal : meals) {
-                totalCalories += meal.getTotalCalories();
-                totalProtein += meal.getTotalProtein();
-                totalCarbs += meal.getTotalCarbs();
-                totalFat += meal.getTotalFat();
-            }
-            
-            std::cout << "\n日期: " << date << std::endl;
-            Utils::displayNutritionChart(totalCalories, totalProtein, totalCarbs, totalFat);
-            
-            std::cout << "\n与目标对比:" << std::endl;
-            Utils::displayProgressBar(totalCalories, currentUser->getDailyCalorieGoal(), "热量");
-            Utils::displayProgressBar(totalProtein, currentUser->getDailyProteinGoal(), "蛋白质");
-            Utils::displayProgressBar(totalCarbs, currentUser->getDailyCarbGoal(), "碳水化合物");
-            Utils::displayProgressBar(totalFat, currentUser->getDailyFatGoal(), "脂肪");
+        // 按日期分组显示
+        std::map<std::string, std::vector<Meal>> mealsByDate;
+        for (const auto& meal : meals) {
+            mealsByDate[meal.getDate()].push_back(meal);
         }
         
-        Utils::pause();
-    }
-
-    void displayNutritionGoals() {
-        std::cout << "\n═══════ 每日营养目标 ═══════" << std::endl;
+        std::cout << "找到 " << meals.size() << " 个餐单记录，按日期分组显示:" << std::endl;
         
-        Utils::displayProgressBar(0, currentUser->getDailyCalorieGoal(), "热量目标");
-        Utils::displayProgressBar(0, currentUser->getDailyProteinGoal(), "蛋白质目标");
-        Utils::displayProgressBar(0, currentUser->getDailyCarbGoal(), "碳水目标");
-        Utils::displayProgressBar(0, currentUser->getDailyFatGoal(), "脂肪目标");
-    }
-
-    void manageProfile() {
-        Utils::clearScreen();
-        std::cout << "\n═══════ 个人资料管理 ═══════" << std::endl;
-        
-        currentUser->displayProfile();
-        
-        std::cout << "\n1. 修改基本信息" << std::endl;
-        std::cout << "2. 重新计算营养目标" << std::endl;
-        std::cout << "0. 返回" << std::endl;
-        
-        int choice = Utils::getIntInput("\n请选择: ");
-        
-        if (choice == 1) {
-            std::cout << "\n修改基本信息:" << std::endl;
-            currentUser->setAge(Utils::getIntInput("年龄: "));
-            currentUser->setWeight(Utils::getDoubleInput("体重 (kg): "));
-            currentUser->setHeight(Utils::getDoubleInput("身高 (cm): "));
-            
-            currentUser->calculateNutritionGoals();
-            db.updateUser(*currentUser);
-            
-            std::cout << "\n信息已更新！" << std::endl;
-            Utils::pause();
-        } else if (choice == 2) {
-            currentUser->calculateNutritionGoals();
-            db.updateUser(*currentUser);
-            std::cout << "\n营养目标已重新计算！" << std::endl;
-            currentUser->displayProfile();
-            Utils::pause();
+        for (const auto& dateGroup : mealsByDate) {
+            std::cout << "\n=== " << dateGroup.first << " ===" << std::endl;
+            for (const auto& meal : dateGroup.second) {
+                meal.displayMeal();
+            }
         }
     }
 
     void managePreferences() {
-        Utils::clearScreen();
-        std::cout << "\n═══════ 口味偏好设置 ═══════" << std::endl;
+        std::cout << "\n=== 口味偏好管理 ===" << std::endl;
         
-        std::cout << "\n当前喜欢的口味: ";
-        for (const auto& tag : currentUser->getPreferredTags()) {
+        std::cout << "当前偏好:" << std::endl;
+        std::cout << "喜欢的标签: ";
+        auto preferredTags = currentUser->getPreferredTags();
+        for (const auto& tag : preferredTags) {
             std::cout << tag << " ";
         }
         std::cout << std::endl;
         
-        std::cout << "当前避免的口味: ";
-        for (const auto& tag : currentUser->getAvoidedTags()) {
+        std::cout << "避免的标签: ";
+        auto avoidedTags = currentUser->getAvoidedTags();
+        for (const auto& tag : avoidedTags) {
             std::cout << tag << " ";
         }
         std::cout << std::endl;
         
-        std::cout << "\n1. 添加喜欢的口味" << std::endl;
-        std::cout << "2. 添加避免的口味" << std::endl;
-        std::cout << "3. 设置过敏源" << std::endl;
+        std::cout << "过敏源: ";
+        auto allergens = currentUser->getAllergens();
+        for (const auto& allergen : allergens) {
+            std::cout << allergen << " ";
+        }
+        std::cout << std::endl;
+        
+        std::cout << "\n选择操作:" << std::endl;
+        std::cout << "1. 添加喜欢的标签" << std::endl;
+        std::cout << "2. 添加避免的标签" << std::endl;
+        std::cout << "3. 添加过敏源" << std::endl;
+        std::cout << "4. 移除喜欢的标签" << std::endl;
+        std::cout << "5. 移除避免的标签" << std::endl;
+        std::cout << "6. 移除过敏源" << std::endl;
         std::cout << "0. 返回" << std::endl;
         
-        int choice = Utils::getIntInput("\n请选择: ");
+        int choice = Utils::getIntInput("选择 (0-6): ");
         
-        if (choice == 1) {
-            std::cout << "\n常见口味标签: 清淡, 甜, 咸, 酸, 辣, 鲜, 香" << std::endl;
-            std::string tag = Utils::getInput("输入口味标签: ");
-            currentUser->addPreferredTag(tag);
-            db.updateUser(*currentUser);
-            std::cout << "已添加！" << std::endl;
-            Utils::pause();
-        } else if (choice == 2) {
-            std::cout << "\n常见口味标签: 清淡, 甜, 咸, 酸, 辣, 鲜, 香" << std::endl;
-            std::string tag = Utils::getInput("输入口味标签: ");
-            currentUser->addAvoidedTag(tag);
-            db.updateUser(*currentUser);
-            std::cout << "已添加！" << std::endl;
-            Utils::pause();
-        } else if (choice == 3) {
-            std::string allergen = Utils::getInput("输入过敏源: ");
-            currentUser->addAllergen(allergen);
-            db.updateUser(*currentUser);
-            std::cout << "已添加！" << std::endl;
-            Utils::pause();
+        switch (choice) {
+            case 1: {
+                std::string tag = Utils::getStringInput("请输入喜欢的标签: ");
+                currentUser->addPreferredTag(tag);
+                break;
+            }
+            case 2: {
+                std::string tag = Utils::getStringInput("请输入要避免的标签: ");
+                currentUser->addAvoidedTag(tag);
+                break;
+            }
+            case 3: {
+                std::string allergen = Utils::getStringInput("请输入过敏源: ");
+                currentUser->addAllergen(allergen);
+                break;
+            }
+            case 4: {
+                std::string tag = Utils::getStringInput("请输入要移除的喜欢标签: ");
+                // 这里需要实现移除方法
+                break;
+            }
+            case 5: {
+                std::string tag = Utils::getStringInput("请输入要移除的避免标签: ");
+                // 这里需要实现移除方法
+                break;
+            }
+            case 6: {
+                std::string allergen = Utils::getStringInput("请输入要移除的过敏源: ");
+                // 这里需要实现移除方法
+                break;
+            }
+            case 0:
+                return;
+            default:
+                std::cout << "无效选择！" << std::endl;
+        }
+        
+        db.updateUser(*currentUser);
+        std::cout << "偏好设置已更新！" << std::endl;
+    }
+
+    void showNutritionStats() {
+        auto meals = db.getMealsByUser(currentUser->getId());
+        
+        if (meals.empty()) {
+            std::cout << "\n暂无餐单记录用于统计。" << std::endl;
+            return;
+        }
+        
+        std::cout << "\n=== 营养统计 ===" << std::endl;
+        
+        std::map<std::string, std::pair<double, int>> stats;
+        double totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0;
+        int mealCount = 0;
+        
+        for (const auto& meal : meals) {
+            totalCalories += meal.getTotalCalories();
+            totalProtein += meal.getTotalProtein();
+            totalCarbs += meal.getTotalCarbs();
+            totalFat += meal.getTotalFat();
+            mealCount++;
+        }
+        
+        if (mealCount > 0) {
+            double avgCalories = totalCalories / mealCount;
+            double avgProtein = totalProtein / mealCount;
+            double avgCarbs = totalCarbs / mealCount;
+            double avgFat = totalFat / mealCount;
+            
+            std::cout << "总餐单数: " << mealCount << std::endl;
+            std::cout << "平均每餐营养:" << std::endl;
+            std::cout << "  热量: " << std::fixed << std::setprecision(1) << avgCalories << " kcal" << std::endl;
+            std::cout << "  蛋白质: " << avgProtein << " g" << std::endl;
+            std::cout << "  碳水化合物: " << avgCarbs << " g" << std::endl;
+            std::cout << "  脂肪: " << avgFat << " g" << std::endl;
+            
+            std::cout << "\n营养目标完成情况:" << std::endl;
+            double calorieCompletion = (avgCalories / currentUser->getDailyCalorieGoal()) * 100;
+            double proteinCompletion = (avgProtein / currentUser->getDailyProteinGoal()) * 100;
+            
+            std::cout << "  热量完成度: " << std::fixed << std::setprecision(1) << calorieCompletion << "%" << std::endl;
+            std::cout << "  蛋白质完成度: " << std::fixed << std::setprecision(1) << proteinCompletion << "%" << std::endl;
         }
     }
 };

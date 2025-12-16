@@ -36,7 +36,7 @@ public:
     
     std::vector<Food> getAlternativeFoods(const Food& food, const User& user, int count = 3);
     
-    void displayRecommendationStats(const User& user) const;
+    void displayRecommendationStats(const std::vector<Meal>& meals);
 };
 
 #endif

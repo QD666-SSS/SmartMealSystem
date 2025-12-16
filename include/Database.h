@@ -7,12 +7,14 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <optional>
+#include <set>
 
 class Database {
 private:
     std::vector<User> users;
     std::vector<Food> foods;
-    std::map<int, std::vector<Meal>> mealHistory;
+    std::vector<Meal> meals;
     
     std::string usersFile;
     std::string foodsFile;
@@ -20,7 +22,6 @@ private:
 
     std::vector<std::string> split(const std::string& str, char delimiter) const;
     std::set<std::string> parseTagString(const std::string& tagStr) const;
-    std::string tagsToString(const std::set<std::string>& tags) const;
 
 public:
     Database();
@@ -34,20 +35,19 @@ public:
     bool saveFoods();
     bool saveMeals();
     
-    bool addUser(const User& user);
+    bool saveUser(const User& user);
     bool updateUser(const User& user);
-    User* findUserByUsername(const std::string& username);
-    User* findUserById(int id);
+    bool saveMeal(const Meal& meal);
     
-    bool addFood(const Food& food);
-    bool updateFood(const Food& food);
-    Food* findFoodById(int id);
+    std::vector<User> getAllUsers() const;
     std::vector<Food> getAllFoods() const;
-    std::vector<Food> searchFoodsByName(const std::string& keyword) const;
+    std::vector<Meal> getAllMeals() const;
     
-    bool addMeal(const Meal& meal);
-    std::vector<Meal> getUserMeals(int userId) const;
-    std::vector<Meal> getUserMealsByDate(int userId, const std::string& date) const;
+    std::vector<Meal> getMealsByUser(int userId) const;
+    std::vector<Meal> getMealsByDate(const std::string& date) const;
+    
+    std::optional<Food> getFoodById(int id) const;
+    std::optional<User> getUserById(int id) const;
     
     int getNextUserId() const;
     int getNextFoodId() const;

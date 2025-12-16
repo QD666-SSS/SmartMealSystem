@@ -1,119 +1,121 @@
 #include "../include/Utils.h"
 #include <iostream>
-#include <ctime>
-#include <sstream>
-#include <iomanip>
-#include <algorithm>
 #include <limits>
-
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
-
-std::string Utils::getCurrentDate() {
-    time_t now = time(0);
-    struct tm timeinfo;
-    
-#ifdef _WIN32
-    localtime_s(&timeinfo, &now);
-#else
-    localtime_r(&now, &timeinfo);
-#endif
-    
-    char buffer[11];
-    strftime(buffer, sizeof(buffer), "%Y-%m-%d", &timeinfo);
-    return std::string(buffer);
-}
+#include <algorithm>
+#include <cctype>
+#include <iomanip>
 
 void Utils::clearScreen() {
 #ifdef _WIN32
-    system("cls");
+    std::system("cls");
 #else
-    system("clear");
+    std::system("clear");
 #endif
 }
 
 void Utils::pause() {
-    std::cout << "\n按 Enter 键继续...";
+    std::cout << "\n按回车键继续...";
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     std::cin.get();
 }
 
-std::string Utils::trim(const std::string& str) {
-    size_t first = str.find_first_not_of(' ');
-    if (std::string::npos == first) {
-        return str;
-    }
-    size_t last = str.find_last_not_of(' ');
-    return str.substr(first, (last - first + 1));
-}
-
-void Utils::displayProgressBar(double current, double target, const std::string& label) {
-    int barWidth = 30;
-    double progress = (target > 0) ? (current / target) : 0;
-    if (progress > 1.0) progress = 1.0;
-    
-    std::cout << "  " << std::left << std::setw(12) << label << " [";
-    
-    int pos = static_cast<int>(barWidth * progress);
-    for (int i = 0; i < barWidth; ++i) {
-        if (i < pos) std::cout << "█";
-        else std::cout << "░";
-    }
-    
-    std::cout << "] " << std::fixed << std::setprecision(1) 
-              << (progress * 100.0) << "% (" 
-              << (int)current << "/" << (int)target << ")" << std::endl;
-}
-
-void Utils::displayNutritionChart(double calories, double protein, double carbs, double fat) {
-    std::cout << "\n╔════════════════════════════════════════════════╗" << std::endl;
-    std::cout << "║             营养成分分布                         ║" << std::endl;
-    std::cout << "╠════════════════════════════════════════════════╣" << std::endl;
-    
-    displayProgressBar(protein * 4, calories, "蛋白质");
-    displayProgressBar(carbs * 4, calories, "碳水化合物");
-    displayProgressBar(fat * 9, calories, "脂肪");
-    
-    std::cout << "╠════════════════════════════════════════════════╣" << std::endl;
-    std::cout << "║  总热量: " << std::fixed << std::setprecision(1) 
-              << calories << " kcal" << std::endl;
-    std::cout << "║  蛋白质: " << protein << " g (" 
-              << (int)((protein * 4 / calories) * 100) << "%)" << std::endl;
-    std::cout << "║  碳水化合物: " << carbs << " g (" 
-              << (int)((carbs * 4 / calories) * 100) << "%)" << std::endl;
-    std::cout << "║  脂肪: " << fat << " g (" 
-              << (int)((fat * 9 / calories) * 100) << "%)" << std::endl;
-    std::cout << "╚════════════════════════════════════════════════╝" << std::endl;
-}
-
-std::string Utils::getInput(const std::string& prompt) {
-    std::cout << prompt;
-    std::string input;
-    std::getline(std::cin, input);
-    return trim(input);
-}
-
 int Utils::getIntInput(const std::string& prompt) {
+    int value;
     while (true) {
-        std::string input = getInput(prompt);
-        try {
-            return std::stoi(input);
-        } catch (...) {
-            std::cout << "输入无效，请输入一个整数。" << std::endl;
+        std::cout << prompt;
+        std::cin >> value;
+        
+        if (std::cin.fail()) {
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cout << "无效输入，请输入一个整数。" << std::endl;
+        } else {
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            return value;
         }
     }
 }
 
 double Utils::getDoubleInput(const std::string& prompt) {
+    double value;
     while (true) {
-        std::string input = getInput(prompt);
-        try {
-            return std::stod(input);
-        } catch (...) {
-            std::cout << "输入无效，请输入一个数字。" << std::endl;
+        std::cout << prompt;
+        std::cin >> value;
+        
+        if (std::cin.fail()) {
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cout << "无效输入，请输入一个数字。" << std::endl;
+        } else {
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            return value;
         }
     }
+}
+
+std::string Utils::getStringInput(const std::string& prompt) {
+    std::string value;
+    while (true) {
+        std::cout << prompt;
+        std::getline(std::cin, value);
+        
+        if (value.empty()) {
+            std::cout << "输入不能为空，请重试。" << std::endl;
+        } else {
+            return value;
+        }
+    }
+}
+
+std::string Utils::trim(const std::string& str) {
+    std::string result = str;
+    result.erase(result.begin(), std::find_if(result.begin(), result.end(), [](int ch) {
+        return !std::isspace(ch);
+    }));
+    result.erase(std::find_if(result.rbegin(), result.rend(), [](int ch) {
+        return !std::isspace(ch);
+    }).base(), result.end());
+    return result;
+}
+
+bool Utils::isValidEmail(const std::string& email) {
+    if (email.empty()) return false;
+    
+    size_t atPos = email.find('@');
+    size_t dotPos = email.rfind('.');
+    
+    return (atPos != std::string::npos && 
+            dotPos != std::string::npos && 
+            atPos < dotPos &&
+            atPos > 0 && 
+            dotPos < email.length() - 1);
+}
+
+void Utils::displayProgressBar(double percentage, int width) {
+    int filled = static_cast<int>(percentage * width / 100);
+    int empty = width - filled;
+    
+    std::cout << "[";
+    for (int i = 0; i < filled; ++i) {
+        std::cout << "=";
+    }
+    for (int i = 0; i < empty; ++i) {
+        std::cout << " ";
+    }
+    std::cout << "] " << std::fixed << std::setprecision(1) << percentage << "%";
+}
+
+std::string Utils::formatDate(const std::string& date) {
+    if (date.length() == 10 && date[4] == '-' && date[7] == '-') {
+        return date.substr(0, 4) + "年" + 
+               date.substr(5, 2) + "月" + 
+               date.substr(8, 2) + "日";
+    }
+    return date;
+}
+
+std::string Utils::toLowerCase(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
 }

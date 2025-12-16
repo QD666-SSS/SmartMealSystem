@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <iomanip>
 #include <map>
 
 RecommendationEngine::RecommendationEngine() {}
@@ -51,24 +52,42 @@ double RecommendationEngine::calculateFoodScore(const Food& food, const User& us
         }
     }
     
-    double calorieDiff = std::abs(food.getCalories() - remainingCalories);
-    score -= calorieDiff * 0.1;
+    // 营养平衡评分
+    double nutritionScore = 0.0;
+    if (remainingCalories > 0) {
+        double calorieRatio = food.getCalories() / remainingCalories;
+        nutritionScore += 20.0 * (1.0 - std::abs(calorieRatio - 1.0));
+    }
     
-    double proteinDiff = std::abs(food.getProtein() - remainingProtein);
-    score -= proteinDiff * 0.5;
+    if (remainingProtein > 0) {
+        double proteinRatio = food.getProtein() / remainingProtein;
+        nutritionScore += 25.0 * (1.0 - std::abs(proteinRatio - 1.0));
+    }
     
-    double carbDiff = std::abs(food.getCarbohydrates() - remainingCarbs);
-    score -= carbDiff * 0.3;
+    if (remainingCarbs > 0) {
+        double carbRatio = food.getCarbohydrates() / remainingCarbs;
+        nutritionScore += 15.0 * (1.0 - std::abs(carbRatio - 1.0));
+    }
     
-    double fatDiff = std::abs(food.getFat() - remainingFat);
-    score -= fatDiff * 0.4;
+    if (remainingFat > 0) {
+        double fatRatio = food.getFat() / remainingFat;
+        nutritionScore += 10.0 * (1.0 - std::abs(fatRatio - 1.0));
+    }
     
-    if (mealType == "breakfast" && food.getCategory() == "主食") {
-        score += 20.0;
-    } else if (mealType == "lunch" && food.getCategory() == "肉类") {
-        score += 15.0;
-    } else if (mealType == "dinner" && food.getCategory() == "蔬菜") {
-        score += 15.0;
+    score += nutritionScore;
+    
+    // 多样性评分 - 避免重复推荐相同食物
+    auto history = userHistory.find(user.getId());
+    if (history != userHistory.end()) {
+        int recentCount = 0;
+        for (const auto& pastMeal : history->second) {
+            for (const auto& pastFood : pastMeal.getFoods()) {
+                if (pastFood.getId() == food.getId()) {
+                    recentCount++;
+                }
+            }
+        }
+        score -= recentCount * 10.0;
     }
     
     return score;
@@ -85,8 +104,8 @@ std::vector<Food> RecommendationEngine::filterFoodsByCategory(const std::string&
 }
 
 Meal RecommendationEngine::recommendMeal(const User& user, const std::string& mealType,
-                                          double targetCalories, double targetProtein,
-                                          double targetCarbs, double targetFat) {
+                                         double targetCalories, double targetProtein,
+                                         double targetCarbs, double targetFat) {
     Meal meal(0, user.getId(), "", mealType);
     meal.setIsRecommended(true);
     
@@ -97,9 +116,9 @@ Meal RecommendationEngine::recommendMeal(const User& user, const std::string& me
     
     std::vector<std::string> categories;
     if (mealType == "breakfast") {
-        categories = {"主食", "蛋类", "饮品"};
+        categories = {"主食", "蛋类"};
     } else if (mealType == "lunch") {
-        categories = {"主食", "肉类", "蔬菜", "汤"};
+        categories = {"主食", "肉类", "蔬菜"};
     } else if (mealType == "dinner") {
         categories = {"主食", "蔬菜", "豆制品"};
     } else {
@@ -179,13 +198,10 @@ std::vector<Food> RecommendationEngine::getAlternativeFoods(const Food& food, co
     
     for (const auto& candidate : foodDatabase) {
         if (candidate.getId() == food.getId()) continue;
-        if (candidate.getCategory() != food.getCategory()) continue;
         
-        double score = calculateFoodScore(candidate, user, "",
-                                         food.getCalories(),
-                                         food.getProtein(),
-                                         food.getCarbohydrates(),
-                                         food.getFat());
+        double score = calculateFoodScore(candidate, user, "alternative",
+                                         food.getCalories(), food.getProtein(),
+                                         food.getCarbohydrates(), food.getFat());
         if (score > -500) {
             scoredFoods.push_back({score, candidate});
         }
@@ -195,43 +211,34 @@ std::vector<Food> RecommendationEngine::getAlternativeFoods(const Food& food, co
              [](const auto& a, const auto& b) { return a.first > b.first; });
     
     std::vector<Food> alternatives;
-    for (size_t i = 0; i < std::min((size_t)count, scoredFoods.size()); ++i) {
+    for (int i = 0; i < std::min(count, (int)scoredFoods.size()); ++i) {
         alternatives.push_back(scoredFoods[i].second);
     }
     
     return alternatives;
 }
 
-void RecommendationEngine::displayRecommendationStats(const User& user) const {
-    auto it = userHistory.find(user.getId());
-    if (it == userHistory.end() || it->second.empty()) {
-        std::cout << "\n暂无历史记录。" << std::endl;
-        return;
-    }
+void RecommendationEngine::displayRecommendationStats(const std::vector<Meal>& meals) {
+    std::cout << "\n=== 推荐统计 ===" << std::endl;
     
-    const auto& meals = it->second;
-    double avgCalories = 0, avgProtein = 0, avgCarbs = 0, avgFat = 0;
+    double totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0;
     
     for (const auto& meal : meals) {
-        avgCalories += meal.getTotalCalories();
-        avgProtein += meal.getTotalProtein();
-        avgCarbs += meal.getTotalCarbs();
-        avgFat += meal.getTotalFat();
+        totalCalories += meal.getTotalCalories();
+        totalProtein += meal.getTotalProtein();
+        totalCarbs += meal.getTotalCarbs();
+        totalFat += meal.getTotalFat();
     }
     
-    int count = meals.size();
-    avgCalories /= count;
-    avgProtein /= count;
-    avgCarbs /= count;
-    avgFat /= count;
+    std::cout << "总营养摄入:" << std::endl;
+    std::cout << "  热量: " << std::fixed << std::setprecision(1) << totalCalories << " kcal" << std::endl;
+    std::cout << "  蛋白质: " << totalProtein << " g" << std::endl;
+    std::cout << "  碳水化合物: " << totalCarbs << " g" << std::endl;
+    std::cout << "  脂肪: " << totalFat << " g" << std::endl;
     
-    std::cout << "\n╔══════════════════════════════════════════╗" << std::endl;
-    std::cout << "║        历史饮食统计                        ║" << std::endl;
-    std::cout << "╠══════════════════════════════════════════╣" << std::endl;
-    std::cout << "║  记录总数: " << count << " 餐" << std::endl;
-    std::cout << "║  平均热量: " << (int)avgCalories << " kcal" << std::endl;
-    std::cout << "║  平均蛋白质: " << (int)avgProtein << " g" << std::endl;
-    std::cout << "║  平均碳水: " << (int)avgCarbs << " g" << std::endl;
-    std::cout << "║  平均脂肪: " << (int)avgFat << " g" << std::endl;
-    std::cout << "╚══════════════════════════════════════════╝" << std::endl;
+    for (const auto& meal : meals) {
+        std::cout << "\n" << meal.getMealType() << " - " << meal.getTotalCalories() 
+                  << " kcal (" << std::fixed << std::setprecision(1) 
+                  << (meal.getTotalCalories() / totalCalories * 100) << "%)" << std::endl;
+    }
 }

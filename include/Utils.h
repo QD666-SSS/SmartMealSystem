@@ -6,15 +6,16 @@
 
 class Utils {
 public:
-    static std::string getCurrentDate();
     static void clearScreen();
     static void pause();
     static std::string trim(const std::string& str);
-    static void displayProgressBar(double current, double target, const std::string& label);
-    static void displayNutritionChart(double calories, double protein, double carbs, double fat);
-    static std::string getInput(const std::string& prompt);
+    static void displayProgressBar(double percentage, int width = 30);
+    static std::string getStringInput(const std::string& prompt);
     static int getIntInput(const std::string& prompt);
     static double getDoubleInput(const std::string& prompt);
+    static bool isValidEmail(const std::string& email);
+    static std::string formatDate(const std::string& date);
+    static std::string toLowerCase(const std::string& str);
 };
 
 #endif
