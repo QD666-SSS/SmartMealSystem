@@ -29,7 +29,7 @@ void User::addAllergen(const std::string& allergen) {
 
 void User::calculateNutritionGoals() {
     double bmr;
-    if (gender == "male" || gender == "男") {
+    if (gender == "male" || gender == u8"男") {
         bmr = 10 * weight + 6.25 * height - 5 * age + 5;
     } else {
         bmr = 10 * weight + 6.25 * height - 5 * age - 161;

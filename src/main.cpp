@@ -54,24 +54,24 @@ private:
 
     void showWelcome() {
          Utils::clearScreen();
-         std::cout << "============================================" << std::endl;
-         std::cout << "                                      " << std::endl;
+         std::cout << u8"============================================" << std::endl;
+         std::cout << u8"                                      " << std::endl;
          std::cout << u8"          智能配餐推荐系统 v1.0             " << std::endl;
-         std::cout << "                                      " << std::endl;
-         std::cout << "     Intelligent Meal Recommendation System " << std::endl;
-         std::cout << "                                      " << std::endl;
-         std::cout << "============================================" << std::endl;
+         std::cout << u8"                                      " << std::endl;
+         std::cout << u8"     Intelligent Meal Recommendation System " << std::endl;
+         std::cout << u8"                                      " << std::endl;
+         std::cout << u8"============================================" << std::endl;
          std::cout << std::endl;
      }
 
     bool loginMenu() {
-         std::cout << "\n=================================" << std::endl;
+         std::cout << u8"\n=================================" << std::endl;
          std::cout << u8"         欢迎使用                   " << std::endl;
-         std::cout << "=================================" << std::endl;
+         std::cout << u8"=================================" << std::endl;
          std::cout << u8"  1. 用户登录                      " << std::endl;
          std::cout << u8"  2. 用户注册                      " << std::endl;
          std::cout << u8"  0. 退出系统                      " << std::endl;
-         std::cout << "=================================" << std::endl;
+         std::cout << u8"=================================" << std::endl;
 
          int choice = Utils::getIntInput(u8"\n请选择 (0-2): ");
         
@@ -181,11 +181,11 @@ private:
 
     void mainMenu() {
          Utils::clearScreen();
-         std::cout << "\n=================================" << std::endl;
+         std::cout << u8"\n=================================" << std::endl;
          std::cout << u8"         主菜单                   " << std::endl;
-         std::cout << "=================================" << std::endl;
+         std::cout << u8"=================================" << std::endl;
          std::cout << u8"  欢迎回来，" << getCurrentUser().getUsername() << u8"!" << std::endl;
-         std::cout << "=================================" << std::endl;
+         std::cout << u8"=================================" << std::endl;
          std::cout << u8"  1. 查看个人信息               " << std::endl;
          std::cout << u8"  2. 查看食物数据库             " << std::endl;
          std::cout << u8"  3. 生成餐单推荐               " << std::endl;
@@ -193,7 +193,7 @@ private:
          std::cout << u8"  5. 口味偏好管理               " << std::endl;
          std::cout << u8"  6. 营养统计                   " << std::endl;
          std::cout << u8"  0. 退出登录                   " << std::endl;
-         std::cout << "=================================" << std::endl;
+         std::cout << u8"=================================" << std::endl;
 
          int choice = Utils::getIntInput(u8"\n请选择 (0-6): ");
         

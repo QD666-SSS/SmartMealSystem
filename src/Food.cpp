@@ -22,10 +22,10 @@ bool Food::hasTag(const std::string& tag) const {
 }
 
 void Food::displayInfo() const {
-     std::cout << "========================================" << std::endl;
+     std::cout << u8"========================================" << std::endl;
      std::cout << u8"  食物: " << name << u8" (ID: " << id << u8")" << std::endl;
      std::cout << u8"  类别: " << category << std::endl;
-     std::cout << "========================================" << std::endl;
+     std::cout << u8"========================================" << std::endl;
      std::cout << u8"  营养成分 (每100g):" << std::endl;
      std::cout << u8"    热量:     " << std::fixed << std::setprecision(1)
                << calories << u8" kcal" << std::endl;
@@ -44,7 +44,7 @@ void Food::displayInfo() const {
          }
          std::cout << std::endl;
      }
-     std::cout << "========================================" << std::endl;
+     std::cout << u8"========================================" << std::endl;
  }
 
 std::string Food::toString() const {
