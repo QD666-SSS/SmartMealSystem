@@ -1,4 +1,4 @@
-﻿#include "../include/Meal.h"
+#include "../include/Meal.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -42,40 +42,40 @@ void Meal::calculateTotals() {
 }
 
 void Meal::displayMeal() const {
-    std::string mealTypeCN;
-    if (mealType == "breakfast") mealTypeCN = "早餐";
-    else if (mealType == "lunch") mealTypeCN = "午餐";
-    else if (mealType == "dinner") mealTypeCN = "晚餐";
-    else if (mealType == "snack") mealTypeCN = "加餐";
-    else mealTypeCN = mealType;
-    
-    std::cout << "\n========================================" << std::endl;
-    std::cout << mealTypeCN << " - " << date;
-    if (isRecommended) std::cout << " [系统推荐]";
-    std::cout << std::endl;
-    std::cout << "========================================" << std::endl;
-    
-    if (foods.empty()) {
-        std::cout << "  (暂无食物)                       " << std::endl;
-    } else {
-        for (size_t i = 0; i < foods.size(); ++i) {
-            std::cout << "  " << (i+1) << ". " << std::left << std::setw(25) 
-                      << foods[i].getName() << std::endl;
-            std::cout << "     热量: " << std::fixed << std::setprecision(1) 
-                      << foods[i].getCalories() << " kcal, "
-                      << "蛋白质: " << foods[i].getProtein() << "g" << std::endl;
-        }
-    }
-    
-    std::cout << "========================================" << std::endl;
-    std::cout << "总计:                                 " << std::endl;
-    std::cout << "  热量:     " << std::fixed << std::setprecision(1) 
-              << totalCalories << " kcal" << std::endl;
-    std::cout << "  蛋白质:   " << totalProtein << " g" << std::endl;
-    std::cout << "  碳水化合物: " << totalCarbs << " g" << std::endl;
-    std::cout << "  脂肪:     " << totalFat << " g" << std::endl;
-    std::cout << "========================================" << std::endl;
-}
+     std::string mealTypeCN;
+     if (mealType == "breakfast") mealTypeCN = u8"早餐";
+     else if (mealType == "lunch") mealTypeCN = u8"午餐";
+     else if (mealType == "dinner") mealTypeCN = u8"晚餐";
+     else if (mealType == "snack") mealTypeCN = u8"加餐";
+     else mealTypeCN = mealType;
+
+     std::cout << "\n========================================" << std::endl;
+     std::cout << mealTypeCN << u8" - " << date;
+     if (isRecommended) std::cout << u8" [系统推荐]";
+     std::cout << std::endl;
+     std::cout << "========================================" << std::endl;
+
+     if (foods.empty()) {
+         std::cout << u8"  (暂无食物)                       " << std::endl;
+     } else {
+         for (size_t i = 0; i < foods.size(); ++i) {
+             std::cout << u8"  " << (i+1) << u8". " << std::left << std::setw(25)
+                       << foods[i].getName() << std::endl;
+             std::cout << u8"     热量: " << std::fixed << std::setprecision(1)
+                       << foods[i].getCalories() << u8" kcal, "
+                       << u8"蛋白质: " << foods[i].getProtein() << u8"g" << std::endl;
+         }
+     }
+
+     std::cout << "========================================" << std::endl;
+     std::cout << u8"总计:                                 " << std::endl;
+     std::cout << u8"  热量:     " << std::fixed << std::setprecision(1)
+               << totalCalories << u8" kcal" << std::endl;
+     std::cout << u8"  蛋白质:   " << totalProtein << u8" g" << std::endl;
+     std::cout << u8"  碳水化合物: " << totalCarbs << u8" g" << std::endl;
+     std::cout << u8"  脂肪:     " << totalFat << u8" g" << std::endl;
+     std::cout << "========================================" << std::endl;
+ }
 
 std::string Meal::toString() const {
     std::stringstream ss;

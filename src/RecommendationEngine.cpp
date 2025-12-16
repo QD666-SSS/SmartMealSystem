@@ -1,4 +1,4 @@
-﻿#include "../include/RecommendationEngine.h"
+#include "../include/RecommendationEngine.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -116,13 +116,13 @@ Meal RecommendationEngine::recommendMeal(const User& user, const std::string& me
     
     std::vector<std::string> categories;
     if (mealType == "breakfast") {
-        categories = {"主食", "蛋类"};
+        categories = {u8"主食", u8"蛋类"};
     } else if (mealType == "lunch") {
-        categories = {"主食", "肉类", "蔬菜"};
+        categories = {u8"主食", u8"肉类", u8"蔬菜"};
     } else if (mealType == "dinner") {
-        categories = {"主食", "蔬菜", "豆制品"};
+        categories = {u8"主食", u8"蔬菜", u8"豆制品"};
     } else {
-        categories = {"水果", "坚果"};
+        categories = {u8"水果", u8"坚果"};
     }
     
     for (const auto& category : categories) {
@@ -219,26 +219,26 @@ std::vector<Food> RecommendationEngine::getAlternativeFoods(const Food& food, co
 }
 
 void RecommendationEngine::displayRecommendationStats(const std::vector<Meal>& meals) {
-    std::cout << "\n=== 推荐统计 ===" << std::endl;
-    
-    double totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0;
-    
-    for (const auto& meal : meals) {
-        totalCalories += meal.getTotalCalories();
-        totalProtein += meal.getTotalProtein();
-        totalCarbs += meal.getTotalCarbs();
-        totalFat += meal.getTotalFat();
-    }
-    
-    std::cout << "总营养摄入:" << std::endl;
-    std::cout << "  热量: " << std::fixed << std::setprecision(1) << totalCalories << " kcal" << std::endl;
-    std::cout << "  蛋白质: " << totalProtein << " g" << std::endl;
-    std::cout << "  碳水化合物: " << totalCarbs << " g" << std::endl;
-    std::cout << "  脂肪: " << totalFat << " g" << std::endl;
-    
-    for (const auto& meal : meals) {
-        std::cout << "\n" << meal.getMealType() << " - " << meal.getTotalCalories() 
-                  << " kcal (" << std::fixed << std::setprecision(1) 
-                  << (meal.getTotalCalories() / totalCalories * 100) << "%)" << std::endl;
-    }
-}
+     std::cout << u8"\n=== 推荐统计 ===" << std::endl;
+
+     double totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0;
+
+     for (const auto& meal : meals) {
+         totalCalories += meal.getTotalCalories();
+         totalProtein += meal.getTotalProtein();
+         totalCarbs += meal.getTotalCarbs();
+         totalFat += meal.getTotalFat();
+     }
+
+     std::cout << u8"总营养摄入:" << std::endl;
+     std::cout << u8"  热量: " << std::fixed << std::setprecision(1) << totalCalories << u8" kcal" << std::endl;
+     std::cout << u8"  蛋白质: " << totalProtein << u8" g" << std::endl;
+     std::cout << u8"  碳水化合物: " << totalCarbs << u8" g" << std::endl;
+     std::cout << u8"  脂肪: " << totalFat << u8" g" << std::endl;
+
+     for (const auto& meal : meals) {
+         std::cout << u8"\n" << meal.getMealType() << u8" - " << meal.getTotalCalories()
+                   << u8" kcal (" << std::fixed << std::setprecision(1)
+                   << (meal.getTotalCalories() / totalCalories * 100) << u8"%)" << std::endl;
+     }
+ }
