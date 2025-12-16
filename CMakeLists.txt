@@ -49,6 +49,8 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(MealRecommendationSystem PRIVATE
         -finput-charset=UTF-8
         -fexec-charset=UTF-8
+        -Wall
+        -Wextra
     )
 endif()
 
