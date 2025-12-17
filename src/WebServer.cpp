@@ -391,6 +391,30 @@ void WebServer::start() {
         res.set_content(createJsonResponse(true, u8"推荐生成成功", mealsArrayToJson(recommendation)), "application/json; charset=utf-8");
     });
     
+    svr.Get("/api/meals/check-date", [this](const httplib::Request& req, httplib::Response& res) {
+        std::string token = req.get_header_value("Authorization");
+        if (token.find("Bearer ") == 0) {
+            token = token.substr(7);
+        }
+        
+        if (sessions.find(token) == sessions.end()) {
+            res.set_content(createJsonResponse(false, u8"未登录或会话已过期"), "application/json; charset=utf-8");
+            return;
+        }
+        
+        User& user = sessions[token];
+        std::string date = req.get_param_value("date");
+        
+        if (date.empty()) {
+            res.set_content(createJsonResponse(false, u8"缺少日期参数"), "application/json; charset=utf-8");
+            return;
+        }
+        
+        auto existingMeals = db.getMealsByDateAndUser(date, user.getId());
+        std::string data = std::string("{\"hasExisting\": ") + (existingMeals.empty() ? "false" : "true") + "}";
+        res.set_content(createJsonResponse(true, "OK", data), "application/json; charset=utf-8");
+    });
+    
     svr.Post("/api/meals/save", [this](const httplib::Request& req, httplib::Response& res) {
         std::string token = req.get_header_value("Authorization");
         if (token.find("Bearer ") == 0) {
@@ -404,6 +428,15 @@ void WebServer::start() {
         
         User& user = sessions[token];
         std::string date = parseJsonString(req.body, "date");
+        bool replaceExisting = parseJsonInt(req.body, "replaceExisting") == 1;
+        
+        // 如果需要替换，先删除当天的现有餐单
+        if (replaceExisting) {
+            auto existingMeals = db.getMealsByDateAndUser(date, user.getId());
+            for (const auto& meal : existingMeals) {
+                db.deleteMeal(meal.getId());
+            }
+        }
         
         auto recommendation = engine.recommendDailyMeals(user, date);
         for (auto& meal : recommendation) {
@@ -413,7 +446,8 @@ void WebServer::start() {
             engine.addToHistory(user.getId(), meal);
         }
         
-        res.set_content(createJsonResponse(true, u8"餐单保存成功"), "application/json; charset=utf-8");
+        std::string message = replaceExisting ? u8"餐单替换保存成功" : u8"餐单保存成功";
+        res.set_content(createJsonResponse(true, message), "application/json; charset=utf-8");
     });
     
     svr.Delete(R"(/api/meals/(\d+))", [this](const httplib::Request& req, httplib::Response& res) {

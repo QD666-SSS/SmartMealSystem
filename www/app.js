@@ -316,7 +316,7 @@ function displayHistory(meals) {
                 <div style="margin-bottom: 30px;">
                     <h3 style="color: #333; margin-bottom: 15px; font-size: 20px;">📅 ${date}</h3>
                     <div style="display: grid; gap: 15px;">
-                        ${dateMeals.map(meal => createMealCard(meal)).join('')}
+                        ${dateMeals.map(meal => createMealCard(meal, true)).join('')}
                     </div>
                     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 15px; color: white; margin-top: 15px;">
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; text-align: center;">
@@ -345,15 +345,29 @@ function displayHistory(meals) {
         }).join('');
 }
 
-function createMealCard(meal) {
+function createMealCard(meal, showDelete = false) {
     const mealTypeNames = {
         'breakfast': '早餐 🌅',
         'lunch': '午餐 ☀️',
         'dinner': '晚餐 🌙'
     };
     
+    const deleteButton = showDelete ? `
+        <button class="delete-meal-btn" onclick="deleteMeal(${meal.id}, '${meal.date}', '${meal.mealType}')" 
+                style="
+                    position: absolute; top: 10px; right: 10px;
+                    background: #ff4757; color: white; border: none;
+                    border-radius: 50%; width: 30px; height: 30px;
+                    cursor: pointer; font-size: 14px; line-height: 1;
+                    display: flex; align-items: center; justify-content: center;
+                " title="删除此餐单">🗑️</button>
+    ` : '';
+    
+    const cardStyle = showDelete ? 'position: relative;' : '';
+    
     return `
-        <div class="meal-card">
+        <div class="meal-card" style="${cardStyle}">
+            ${deleteButton}
             <div class="meal-header">
                 <div class="meal-type">${mealTypeNames[meal.mealType] || meal.mealType}</div>
             </div>
@@ -407,6 +421,91 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
     }
 });
 
+document.getElementById('checkDateBtn').addEventListener('click', async () => {
+    const date = document.getElementById('recommendDate').value;
+    if (!date) {
+        showToast('请选择日期', 'error');
+        return;
+    }
+    
+    const result = await apiCall(`/api/meals/check-date?date=${date}`);
+    if (result && result.data) {
+        if (result.data.hasExisting) {
+            showConfirmDialog('此日期已有保存的餐单，是否替换为新的推荐？', async () => {
+                await saveRecommendation(date, true);
+            });
+        } else {
+            await saveRecommendation(date, false);
+        }
+    }
+});
+
+async function saveRecommendation(date, replaceExisting) {
+    const result = await apiCall('/api/meals/save', {
+        method: 'POST',
+        body: JSON.stringify({ date, replaceExisting: replaceExisting ? 1 : 0 })
+    });
+    
+    if (result) {
+        const message = replaceExisting ? '推荐已替换保存！' : '推荐已保存到历史记录！';
+        showToast(message);
+    }
+}
+
+function showConfirmDialog(message, onConfirm, onCancel = null) {
+    // 创建确认对话框
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); display: flex; align-items: center;
+        justify-content: center; z-index: 10000;
+    `;
+    
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+        background: white; padding: 30px; border-radius: 15px;
+        max-width: 400px; width: 90%; text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    `;
+    
+    dialog.innerHTML = `
+        <div style="font-size: 18px; margin-bottom: 20px; color: #333;">${message}</div>
+        <div style="display: flex; gap: 15px; justify-content: center;">
+            <button id="confirmBtn" style="
+                background: #667eea; color: white; border: none; 
+                padding: 10px 20px; border-radius: 8px; cursor: pointer;
+                font-size: 14px;
+            ">确认</button>
+            <button id="cancelBtn" style="
+                background: #ccc; color: #666; border: none;
+                padding: 10px 20px; border-radius: 8px; cursor: pointer;
+                font-size: 14px;
+            ">取消</button>
+        </div>
+    `;
+    
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    
+    document.getElementById('confirmBtn').onclick = () => {
+        document.body.removeChild(overlay);
+        if (onConfirm) onConfirm();
+    };
+    
+    document.getElementById('cancelBtn').onclick = () => {
+        document.body.removeChild(overlay);
+        if (onCancel) onCancel();
+    };
+    
+    // 点击背景关闭
+    overlay.onclick = (e) => {
+        if (e.target === overlay) {
+            document.body.removeChild(overlay);
+            if (onCancel) onCancel();
+        }
+    };
+}
+
 function displayRecommendation(meals, date) {
     const grid = document.getElementById('recommendResults');
     
@@ -419,9 +518,14 @@ function displayRecommendation(meals, date) {
         <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 30px; border-radius: 20px; color: white; margin-bottom: 25px; text-align: center;">
             <h3 style="font-size: 24px; margin-bottom: 10px;">✨ 为您精心推荐</h3>
             <p style="opacity: 0.9; margin-bottom: 20px;">${date} 的营养配餐方案</p>
-            <button id="saveRecommendBtn" class="btn-primary" style="background: white; color: #43e97b; max-width: 200px; margin: 0 auto;">
-                💾 保存此推荐
-            </button>
+            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                <button id="checkAndSaveBtn" class="btn-primary" style="background: white; color: #43e97b; max-width: 180px; margin: 0 auto;">
+                    💾 保存/替换餐单
+                </button>
+                <button id="saveRecommendBtn" class="btn-primary" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); max-width: 150px; margin: 0 auto;">
+                    📋 直接保存
+                </button>
+            </div>
         </div>
         
         <div style="display: grid; gap: 15px; margin-bottom: 25px;">
@@ -465,6 +569,36 @@ function displayRecommendation(meals, date) {
             showToast('推荐已保存到历史记录！');
         }
     });
+    
+    document.getElementById('checkAndSaveBtn').addEventListener('click', async () => {
+        const result = await apiCall(`/api/meals/check-date?date=${date}`);
+        if (result && result.data) {
+            if (result.data.hasExisting) {
+                showConfirmDialog('此日期已有保存的餐单，是否替换为新的推荐？', async () => {
+                    await saveRecommendation(date, true);
+                });
+            } else {
+                await saveRecommendation(date, false);
+            }
+        }
+    });
+}
+
+async function deleteMeal(mealId, mealDate, mealType) {
+    showConfirmDialog(
+        `确定要删除 ${mealDate} 的${mealType === 'breakfast' ? '早餐' : mealType === 'lunch' ? '午餐' : '晚餐'}吗？`,
+        async () => {
+            const result = await apiCall(`/api/meals/${mealId}`, {
+                method: 'DELETE'
+            });
+            
+            if (result) {
+                showToast('餐单删除成功！');
+                // 重新加载历史记录
+                loadHistory();
+            }
+        }
+    );
 }
 
 if (authToken) {

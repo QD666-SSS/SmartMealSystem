@@ -47,6 +47,7 @@ public:
     
     std::vector<Meal> getMealsByUser(int userId) const;
     std::vector<Meal> getMealsByDate(const std::string& date) const;
+    std::vector<Meal> getMealsByDateAndUser(const std::string& date, int userId) const;
     
     std::optional<Food> getFoodById(int id) const;
     std::optional<User> getUserById(int id) const;

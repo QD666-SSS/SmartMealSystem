@@ -319,6 +319,16 @@ std::vector<Meal> Database::getMealsByDate(const std::string& date) const {
     return result;
 }
 
+std::vector<Meal> Database::getMealsByDateAndUser(const std::string& date, int userId) const {
+    std::vector<Meal> result;
+    for (const auto& meal : meals) {
+        if (meal.getDate() == date && meal.getUserId() == userId) {
+            result.push_back(meal);
+        }
+    }
+    return result;
+}
+
 std::optional<Food> Database::getFoodById(int id) const {
     for (const auto& food : foods) {
         if (food.getId() == id) {
