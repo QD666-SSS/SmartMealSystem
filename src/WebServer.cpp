@@ -1,761 +1,187 @@
 #include "WebServer.h"
 #include <iostream>
-#include <winsock2.h>
-#include <ws2tcpip.h>
 #include <thread>
 #include <chrono>
 #include <sstream>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
+#include <vector>
 
-#pragma comment(lib, "ws2_32.lib")
+// 跨平台的socket处理
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #pragma comment(lib, "ws2_32.lib")
+#else
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <unistd.h>
+    #include <cstring>
+    #include <arpa/inet.h>
+    #define closesocket close
+#endif
 
-class SimpleWebServer {
-private:
-    int port;
-    SOCKET server_socket;
-    std::atomic<bool> running;
+SimpleWebServer::SimpleWebServer(int port) : port(port), server_socket(INVALID_SOCKET), running(false) {}
 
-public:
-    SimpleWebServer(int port = 8080) : port(port), server_socket(INVALID_SOCKET), running(false) {}
-    
-    ~SimpleWebServer() {
+SimpleWebServer::~SimpleWebServer() {
+    cleanup();
+}
+
+void SimpleWebServer::start() {
+    if (initialize()) {
+        running = true;
+        std::cout << "Web服务器启动在端口 " << port << std::endl;
+        run();
+    }
+}
+
+void SimpleWebServer::stop() {
+    running = false;
+    closesocket(server_socket);
+    cleanup();
+}
+
+bool SimpleWebServer::initialize() {
+#ifdef _WIN32
+    WSADATA wsaData;
+    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (result != 0) {
+        std::cout << "WSAStartup失败: " << result << std::endl;
+        return false;
+    }
+#endif
+
+    server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_socket == INVALID_SOCKET) {
+        std::cout << "创建socket失败" << std::endl;
         cleanup();
+        return false;
     }
-    
-    void start() {
-        if (initialize()) {
-            running = true;
-            std::cout << "Web服务器启动在端口 " << port << std::endl;
-            run();
-        }
-    }
-    
-    void stop() {
-        running = false;
+
+    int opt = 1;
+    setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt));
+
+    struct sockaddr_in address;
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(port);
+
+    if (bind(server_socket, (struct sockaddr*)&address, sizeof(address)) == SOCKET_ERROR) {
+        std::cout << "绑定失败" << std::endl;
         closesocket(server_socket);
-        WSACleanup();
+        cleanup();
+        return false;
     }
 
-private:
-    bool initialize() {
-        WSADATA wsaData;
-        int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-        if (result != 0) {
-            std::cout << "WSAStartup失败: " << result << std::endl;
-            return false;
+    if (listen(server_socket, SOMAXCONN) == SOCKET_ERROR) {
+        std::cout << "监听失败" << std::endl;
+        closesocket(server_socket);
+        cleanup();
+        return false;
+    }
+
+    return true;
+}
+
+void SimpleWebServer::run() {
+    while (running) {
+        struct sockaddr_in client_addr;
+        socklen_t client_len = sizeof(client_addr);
+        socket_t client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_len);
+        
+        if (client_socket != INVALID_SOCKET) {
+            std::thread(&SimpleWebServer::handleClient, this, client_socket).detach();
         }
+    }
+}
 
-        server_socket = socket(AF_INET, SOCK_STREAM, 0);
-        if (server_socket == INVALID_SOCKET) {
-            std::cout << "创建socket失败: " << WSAGetLastError() << std::endl;
-            WSACleanup();
-            return false;
-        }
-
-        int opt = 1;
-        setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt));
-
-        struct sockaddr_in address;
-        address.sin_family = AF_INET;
-        address.sin_addr.s_addr = INADDR_ANY;
-        address.sin_port = htons(port);
-
-        if (bind(server_socket, (struct sockaddr*)&address, sizeof(address)) == SOCKET_ERROR) {
-            std::cout << "绑定失败: " << WSAGetLastError() << std::endl;
-            closesocket(server_socket);
-            WSACleanup();
-            return false;
-        }
-
-        if (listen(server_socket, SOMAXCONN) == SOCKET_ERROR) {
-            std::cout << "监听失败: " << WSAGetLastError() << std::endl;
-            closesocket(server_socket);
-            WSACleanup();
-            return false;
-        }
-
-        return true;
+void SimpleWebServer::handleClient(socket_t client_socket) {
+    char buffer[4096] = {0};
+    int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+    
+    if (bytes_received > 0) {
+        std::string request(buffer, bytes_received);
+        std::string response = handleHttpRequest(request);
+        send(client_socket, response.c_str(), response.length(), 0);
     }
     
-    void run() {
-        while (running) {
-            struct sockaddr_in client_addr;
-            int client_len = sizeof(client_addr);
-            SOCKET client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_len);
-            
-            if (client_socket != INVALID_SOCKET) {
-                std::thread(&SimpleWebServer::handleClient, this, client_socket).detach();
-            }
-        }
-    }
-    
-    void handleClient(SOCKET client_socket) {
-        char buffer[4096] = {0};
-        int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
-        
-        if (bytes_received > 0) {
-            std::string request(buffer, bytes_received);
-            std::string response = handleHttpRequest(request);
-            send(client_socket, response.c_str(), response.length(), 0);
-        }
-        
-        closesocket(client_socket);
-    }
-    
-    std::string handleHttpRequest(const std::string& request) {
-        std::istringstream stream(request);
-        std::string method, path, version;
-        stream >> method >> path >> version;
-        
-        std::string response;
-        
-        if (path == "/" || path == "/index.html") {
-            response = serveIndexPage();
-        } else if (path == "/api/login") {
-            response = handleLogin(request);
-        } else if (path == "/api/register") {
-            response = handleRegister(request);
-        } else {
-            response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\n404 Not Found";
-        }
-        
-        return response;
-    }
-    
-    std::string serveIndexPage() {
-        std::string html = R"(<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能配餐推荐系统</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Microsoft YaHei', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-            width: 90%;
-            max-width: 800px;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-        
-        .header h1 {
-            color: #333;
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-        
-        .header p {
-            color: #666;
-            font-size: 1.1em;
-        }
-        
-        .tabs {
-            display: flex;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #eee;
-        }
-        
-        .tab {
-            flex: 1;
-            padding: 15px;
-            text-align: center;
-            cursor: pointer;
-            background: none;
-            border: none;
-            font-size: 1.1em;
-            color: #666;
-            transition: all 0.3s;
-        }
-        
-        .tab.active {
-            color: #667eea;
-            border-bottom: 2px solid #667eea;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #eee;
-            border-radius: 10px;
-            font-size: 1em;
-            transition: border-color 0.3s;
-        }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .btn {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.1em;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-        }
-        
-        .dashboard {
-            display: none;
-        }
-        
-        .dashboard.active {
-            display: block;
-        }
-        
-        .nav-menu {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-        }
-        
-        .nav-btn {
-            padding: 12px 24px;
-            background: #f8f9fa;
-            border: 2px solid #eee;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            color: #333;
-            text-decoration: none;
-        }
-        
-        .nav-btn:hover, .nav-btn.active {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-        
-        .section {
-            display: none;
-        }
-        
-        .section.active {
-            display: block;
-        }
-        
-        .user-info {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-        }
-        
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-        
-        .info-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .food-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        
-        .food-card {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px solid #eee;
-        }
-        
-        .food-card h3 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .food-nutrients {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 15px;
-        }
-        
-        .nutrient {
-            display: flex;
-            justify-content: space-between;
-        }
-        
-        @media (max-width: 768px) {
-            .container {
-                padding: 20px;
-            }
-            
-            .header h1 {
-                font-size: 2em;
-            }
-            
-            .nav-menu {
-                flex-direction: column;
-                align-items: center;
-            }
-            
-            .nav-btn {
-                width: 200px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- 登录/注册页面 -->
-        <div id="authPage" class="auth-page">
-            <div class="header">
-                <h1>智能配餐推荐系统</h1>
-                <p>Intelligent Meal Recommendation System</p>
-            </div>
-            
-            <div class="tabs">
-                <button class="tab active" onclick="switchTab('login')">用户登录</button>
-                <button class="tab" onclick="switchTab('register')">用户注册</button>
-            </div>
-            
-            <!-- 登录表单 -->
-            <form id="loginForm" onsubmit="handleLogin(event)">
-                <div class="form-group">
-                    <label for="loginUsername">用户名</label>
-                    <input type="text" id="loginUsername" name="username" required>
-                </div>
-                <div class="form-group">
-                    <label for="loginPassword">密码</label>
-                    <input type="password" id="loginPassword" name="password" required>
-                </div>
-                <button type="submit" class="btn">登录</button>
-            </form>
-            
-            <!-- 注册表单 -->
-            <form id="registerForm" onsubmit="handleRegister(event)" style="display: none;">
-                <div class="form-group">
-                    <label for="registerUsername">用户名</label>
-                    <input type="text" id="registerUsername" name="username" required>
-                </div>
-                <div class="form-group">
-                    <label for="registerPassword">密码</label>
-                    <input type="password" id="registerPassword" name="password" required>
-                </div>
-                <div class="form-group">
-                    <label for="confirmPassword">确认密码</label>
-                    <input type="password" id="confirmPassword" name="confirmPassword" required>
-                </div>
-                <button type="submit" class="btn">注册</button>
-            </form>
-        </div>
-        
-        <!-- 主界面 -->
-        <div id="dashboard" class="dashboard">
-            <div class="header">
-                <h1>欢迎使用智能配餐推荐系统</h1>
-                <p id="welcomeText"></p>
-                <button onclick="logout()" style="margin-top: 20px; padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">退出登录</button>
-            </div>
-            
-            <div class="nav-menu">
-                <button class="nav-btn active" onclick="showSection('profile')">个人资料</button>
-                <button class="nav-btn" onclick="showSection('foods')">食物库</button>
-                <button class="nav-btn" onclick="showSection('recommendations')">推荐计划</button>
-                <button class="nav-btn" onclick="showSection('meals')">我的餐食</button>
-                <button class="nav-btn" onclick="showSection('statistics')">营养统计</button>
-            </div>
-            
-            <!-- 个人资料 -->
-            <div id="profileSection" class="section active">
-                <h2>个人资料</h2>
-                <div class="user-info" id="userInfo">
-                    <!-- 用户信息将在这里显示 -->
-                </div>
-            </div>
-            
-            <!-- 食物库 -->
-            <div id="foodsSection" class="section">
-                <h2>食物库</h2>
-                <div class="food-grid" id="foodGrid">
-                    <!-- 食物列表将在这里显示 -->
-                </div>
-            </div>
-            
-            <!-- 推荐计划 -->
-            <div id="recommendationsSection" class="section">
-                <h2>推荐计划</h2>
-                <button onclick="generateRecommendations()" class="btn" style="margin-bottom: 20px;">生成今日推荐</button>
-                <div id="recommendationsList">
-                    <!-- 推荐列表将在这里显示 -->
-                </div>
-            </div>
-            
-            <!-- 我的餐食 -->
-            <div id="mealsSection" class="section">
-                <h2>我的餐食</h2>
-                <div id="mealsList">
-                    <!-- 餐食列表将在这里显示 -->
-                </div>
-            </div>
-            
-            <!-- 营养统计 -->
-            <div id="statisticsSection" class="section">
-                <h2>营养统计</h2>
-                <div id="statisticsInfo">
-                    <!-- 统计信息将在这里显示 -->
-                </div>
-            </div>
-        </div>
-    </div>
+    closesocket(client_socket);
+}
 
-    <script>
-        // 全局变量
-        let currentUser = null;
-        let foods = [];
-        
-        // 页面切换函数
-        function switchTab(tab) {
-            // 更新标签状态
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
-            
-            // 显示对应表单
-            document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
-            document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
-        }
-        
-        // 登录处理
-        async function handleLogin(event) {
-            event.preventDefault();
-            const formData = new FormData(event.target);
-            const data = Object.fromEntries(formData);
-            
-            try {
-                const response = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    currentUser = result.user;
-                    showDashboard();
-                } else {
-                    alert('登录失败: ' + result.message);
-                }
-            } catch (error) {
-                alert('登录出错: ' + error.message);
-            }
-        }
-        
-        // 注册处理
-        async function handleRegister(event) {
-            event.preventDefault();
-            const formData = new FormData(event.target);
-            const data = Object.fromEntries(formData);
-            
-            if (data.password !== data.confirmPassword) {
-                alert('密码不匹配');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert('注册成功！请登录');
-                    switchTab('login');
-                } else {
-                    alert('注册失败: ' + result.message);
-                }
-            } catch (error) {
-                alert('注册出错: ' + error.message);
-            }
-        }
-        
-        // 显示主界面
-        function showDashboard() {
-            document.getElementById('authPage').style.display = 'none';
-            document.getElementById('dashboard').style.display = 'block';
-            document.getElementById('welcomeText').textContent = `欢迎，${currentUser.username}！`;
-            
-            loadUserProfile();
-            loadFoods();
-        }
-        
-        // 退出登录
-        function logout() {
-            currentUser = null;
-            document.getElementById('authPage').style.display = 'block';
-            document.getElementById('dashboard').style.display = 'none';
-        }
-        
-        // 导航功能
-        function showSection(sectionName) {
-            // 更新导航按钮状态
-            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-            
-            // 显示对应部分
-            document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
-            document.getElementById(sectionName + 'Section').classList.add('active');
-            
-            // 加载对应数据
-            switch(sectionName) {
-                case 'profile':
-                    loadUserProfile();
-                    break;
-                case 'foods':
-                    loadFoods();
-                    break;
-                case 'meals':
-                    loadMeals();
-                    break;
-                case 'statistics':
-                    loadStatistics();
-                    break;
-            }
-        }
-        
-        // 加载用户资料
-        function loadUserProfile() {
-            if (currentUser) {
-                document.getElementById('userInfo').innerHTML = `
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <span>用户名:</span>
-                            <span>${currentUser.username}</span>
-                        </div>
-                        <div class="info-item">
-                            <span>年龄:</span>
-                            <span>${currentUser.age || '未设置'}</span>
-                        </div>
-                        <div class="info-item">
-                            <span>性别:</span>
-                            <span>${currentUser.gender || '未设置'}</span>
-                        </div>
-                        <div class="info-item">
-                            <span>身高:</span>
-                            <span>${currentUser.height || '未设置'} cm</span>
-                        </div>
-                        <div class="info-item">
-                            <span>体重:</span>
-                            <span>${currentUser.weight || '未设置'} kg</span>
-                        </div>
-                        <div class="info-item">
-                            <span>每日卡路里目标:</span>
-                            <span>${currentUser.dailyCalorieGoal || '未计算'} kcal</span>
-                        </div>
-                        <div class="info-item">
-                            <span>蛋白质目标:</span>
-                            <span>${currentUser.dailyProteinGoal || '未计算'} g</span>
-                        </div>
-                        <div class="info-item">
-                            <span>碳水目标:</span>
-                            <span>${currentUser.dailyCarbGoal || '未计算'} g</span>
-                        </div>
-                        <div class="info-item">
-                            <span>脂肪目标:</span>
-                            <span>${currentUser.dailyFatGoal || '未计算'} g</span>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-        
-        // 加载食物库
-        function loadFoods() {
-            // 模拟食物数据
-            foods = [
-                {
-                    id: 1,
-                    name: '苹果',
-                    calories: 52,
-                    protein: 0.3,
-                    carbs: 14,
-                    fat: 0.2,
-                    tags: ['水果', '甜味', '清爽']
-                },
-                {
-                    id: 2,
-                    name: '鸡胸肉',
-                    calories: 165,
-                    protein: 31,
-                    carbs: 0,
-                    fat: 3.6,
-                    tags: ['肉类', '高蛋白', '清淡']
-                },
-                {
-                    id: 3,
-                    name: '糙米饭',
-                    calories: 111,
-                    protein: 2.6,
-                    carbs: 23,
-                    fat: 0.9,
-                    tags: ['主食', '碳水', '谷物']
-                }
-            ];
-            
-            document.getElementById('foodGrid').innerHTML = foods.map(food => `
-                <div class="food-card">
-                    <h3>${food.name}</h3>
-                    <div class="food-nutrients">
-                        <div class="nutrient">
-                            <span>卡路里:</span>
-                            <span>${food.calories} kcal</span>
-                        </div>
-                        <div class="nutrient">
-                            <span>蛋白质:</span>
-                            <span>${food.protein} g</span>
-                        </div>
-                        <div class="nutrient">
-                            <span>碳水:</span>
-                            <span>${food.carbs} g</span>
-                        </div>
-                        <div class="nutrient">
-                            <span>脂肪:</span>
-                            <span>${food.fat} g</span>
-                        </div>
-                    </div>
-                    <div style="margin-top: 15px;">
-                        <strong>标签:</strong> ${food.tags.join(', ')}
-                    </div>
-                </div>
-            `).join('');
-        }
-        
-        // 生成推荐
-        async function generateRecommendations() {
-            // 模拟推荐生成
-            setTimeout(() => {
-                document.getElementById('recommendationsList').innerHTML = `
-                    <div class="food-card">
-                        <h3>今日早餐推荐</h3>
-                        <p>糙米饭 + 鸡胸肉 + 苹果</p>
-                        <p><strong>总卡路里:</strong> 328 kcal</p>
-                    </div>
-                    <div class="food-card">
-                        <h3>今日午餐推荐</h3>
-                        <p>鸡胸肉沙拉 + 糙米饭</p>
-                        <p><strong>总卡路里:</strong> 276 kcal</p>
-                    </div>
-                    <div class="food-card">
-                        <h3>今日晚餐推荐</h3>
-                        <p>糙米饭 + 苹果</p>
-                        <p><strong>总卡路里:</strong> 163 kcal</p>
-                    </div>
-                `;
-            }, 1000);
-        }
-        
-        // 加载餐食记录
-        function loadMeals() {
-            document.getElementById('mealsList').innerHTML = '<p>暂无餐食记录</p>';
-        }
-        
-        // 加载统计信息
-        function loadStatistics() {
-            document.getElementById('statisticsInfo').innerHTML = `
-                <div class="user-info">
-                    <h3>本周营养摄入统计</h3>
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <span>平均每日卡路里:</span>
-                            <span>1850 kcal</span>
-                        </div>
-                        <div class="info-item">
-                            <span>平均每日蛋白质:</span>
-                            <span>75 g</span>
-                        </div>
-                        <div class="info-item">
-                            <span>平均每日碳水:</span>
-                            <span>220 g</span>
-                        </div>
-                        <div class="info-item">
-                            <span>平均每日脂肪:</span>
-                            <span>65 g</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-    </script>
-</body>
-</html>)";
-        
-        return "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " + 
-               std::to_string(html.length()) + "\r\n\r\n" + html;
+std::string SimpleWebServer::handleHttpRequest(const std::string& request) {
+    std::istringstream stream(request);
+    std::string method, path, version;
+    stream >> method >> path >> version;
+    
+    std::string response;
+    
+    if (path == "/" || path == "/index.html") {
+        response = serveIndexPage();
+    } else if (path == "/api/login") {
+        response = handleLogin(request);
+    } else if (path == "/api/register") {
+        response = handleRegister(request);
+    } else {
+        response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\n404 Not Found";
     }
     
-    std::string handleLogin(const std::string& request) {
-        // 简单的登录验证逻辑
-        // 这里应该与C++的User类集成
-        return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 50\r\n\r\n{\"success\":true,\"message\":\"登录成功\"}";
-    }
+    return response;
+}
+
+std::string SimpleWebServer::serveIndexPage() {
+    std::string html;
+    // 尝试多个可能的路径
+    std::vector<std::string> possiblePaths = {
+        "index.html",
+        "src/index.html",
+        "./index.html"
+    };
     
-    std::string handleRegister(const std::string& request) {
-        // 简单的注册逻辑
-        return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 50\r\n\r\n{\"success\":true,\"message\":\"注册成功\"}";
-    }
-    
-    void cleanup() {
-        if (server_socket != INVALID_SOCKET) {
-            closesocket(server_socket);
+    for (const auto& path : possiblePaths) {
+        std::ifstream file(path);
+        if (file.is_open()) {
+            std::ostringstream ss;
+            ss << file.rdbuf();
+            html = ss.str();
+            file.close();
+            break;
         }
-        WSACleanup();
     }
-};
+    
+    if (html.empty()) {
+        html = "<html><body><h1>Error: Could not load index.html</h1></body></html>";
+    }
+    
+    return "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " + 
+           std::to_string(html.length()) + "\r\n\r\n" + html;
+}
+
+std::string SimpleWebServer::handleLogin(const std::string& request) {
+    // 简单的登录验证逻辑
+    // 这里应该与C++的User类集成
+    return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 50\r\n\r\n{\"success\":true,\"message\":\"Login successful\"}";
+}
+
+std::string SimpleWebServer::handleRegister(const std::string& request) {
+    // 简单的注册逻辑
+    return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 50\r\n\r\n{\"success\":true,\"message\":\"Registration successful\"}";
+}
+
+void SimpleWebServer::cleanup() {
+    if (server_socket != INVALID_SOCKET) {
+        closesocket(server_socket);
+    }
+#ifdef _WIN32
+    WSACleanup();
+#endif
+}
+
+// 导出SimpleWebServer类供外部使用
+SimpleWebServer* CreateWebServer(int port) {
+    return new SimpleWebServer(port);
+}
+
+void DeleteWebServer(SimpleWebServer* server) {
+    delete server;
+}
