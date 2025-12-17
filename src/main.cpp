@@ -42,7 +42,7 @@ public:
         std::cout << std::endl;
         
         // 创建并启动Web服务器
-        SimpleWebServer* server = CreateWebServer(port);
+        SimpleWebServer* server = CreateWebServer(&db, &engine, port);
         server->start();
         DeleteWebServer(server);
     }

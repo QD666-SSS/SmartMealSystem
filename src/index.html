@@ -493,120 +493,142 @@
         }
         
         // 加载食物库
-        function loadFoods() {
-            // 模拟食物数据
-            foods = [
-                {
-                    id: 1,
-                    name: '苹果',
-                    calories: 52,
-                    protein: 0.3,
-                    carbs: 14,
-                    fat: 0.2,
-                    tags: ['水果', '甜味', '清爽']
-                },
-                {
-                    id: 2,
-                    name: '鸡胸肉',
-                    calories: 165,
-                    protein: 31,
-                    carbs: 0,
-                    fat: 3.6,
-                    tags: ['肉类', '高蛋白', '清淡']
-                },
-                {
-                    id: 3,
-                    name: '糙米饭',
-                    calories: 111,
-                    protein: 2.6,
-                    carbs: 23,
-                    fat: 0.9,
-                    tags: ['主食', '碳水', '谷物']
-                }
-            ];
-            
-            document.getElementById('foodGrid').innerHTML = foods.map(food => `
-                <div class="food-card">
-                    <h3>${food.name}</h3>
-                    <div class="food-nutrients">
-                        <div class="nutrient">
-                            <span>卡路里:</span>
-                            <span>${food.calories} kcal</span>
+        async function loadFoods() {
+            try {
+                const response = await fetch('/api/foods');
+                if (!response.ok) throw new Error('Failed to load foods');
+                foods = await response.json();
+                
+                document.getElementById('foodGrid').innerHTML = foods.map(food => `
+                    <div class="food-card">
+                        <h3>${food.name}</h3>
+                        <div class="food-nutrients">
+                            <div class="nutrient">
+                                <span>卡路里:</span>
+                                <span>${food.calories} kcal</span>
+                            </div>
+                            <div class="nutrient">
+                                <span>蛋白质:</span>
+                                <span>${food.protein} g</span>
+                            </div>
+                            <div class="nutrient">
+                                <span>碳水:</span>
+                                <span>${food.carbs} g</span>
+                            </div>
+                            <div class="nutrient">
+                                <span>脂肪:</span>
+                                <span>${food.fat} g</span>
+                            </div>
                         </div>
-                        <div class="nutrient">
-                            <span>蛋白质:</span>
-                            <span>${food.protein} g</span>
-                        </div>
-                        <div class="nutrient">
-                            <span>碳水:</span>
-                            <span>${food.carbs} g</span>
-                        </div>
-                        <div class="nutrient">
-                            <span>脂肪:</span>
-                            <span>${food.fat} g</span>
+                        <div style="margin-top: 15px;">
+                            <strong>标签:</strong> ${food.tags.join(', ')}
                         </div>
                     </div>
-                    <div style="margin-top: 15px;">
-                        <strong>标签:</strong> ${food.tags.join(', ')}
-                    </div>
-                </div>
-            `).join('');
+                `).join('');
+            } catch (error) {
+                console.error(error);
+                document.getElementById('foodGrid').innerHTML = '<p>加载食物数据失败</p>';
+            }
         }
         
         // 生成推荐
         async function generateRecommendations() {
-            // 模拟推荐生成
-            setTimeout(() => {
-                document.getElementById('recommendationsList').innerHTML = `
+            if (!currentUser) return;
+            
+            document.getElementById('recommendationsList').innerHTML = '<p>正在生成推荐...</p>';
+            
+            try {
+                const response = await fetch(`/api/recommendations?userId=${currentUser.id}`);
+                if (!response.ok) throw new Error('Failed to get recommendations');
+                
+                const meals = await response.json();
+                
+                if (meals.length === 0) {
+                    document.getElementById('recommendationsList').innerHTML = '<p>无法生成推荐，可能是食物库为空或没有符合偏好的食物。</p>';
+                    return;
+                }
+                
+                document.getElementById('recommendationsList').innerHTML = meals.map(meal => `
                     <div class="food-card">
-                        <h3>今日早餐推荐</h3>
-                        <p>糙米饭 + 鸡胸肉 + 苹果</p>
-                        <p><strong>总卡路里:</strong> 328 kcal</p>
+                        <h3>${meal.type}推荐: ${meal.name}</h3>
+                        <p>${meal.items.join(' + ')}</p>
+                        <p><strong>总卡路里:</strong> ${meal.calories.toFixed(0)} kcal</p>
                     </div>
-                    <div class="food-card">
-                        <h3>今日午餐推荐</h3>
-                        <p>鸡胸肉沙拉 + 糙米饭</p>
-                        <p><strong>总卡路里:</strong> 276 kcal</p>
-                    </div>
-                    <div class="food-card">
-                        <h3>今日晚餐推荐</h3>
-                        <p>糙米饭 + 苹果</p>
-                        <p><strong>总卡路里:</strong> 163 kcal</p>
-                    </div>
-                `;
-            }, 1000);
+                `).join('');
+            } catch (error) {
+                console.error(error);
+                document.getElementById('recommendationsList').innerHTML = '<p>获取推荐失败</p>';
+            }
         }
         
         // 加载餐食记录
-        function loadMeals() {
-            document.getElementById('mealsList').innerHTML = '<p>暂无餐食记录</p>';
+        async function loadMeals() {
+            if (!currentUser) return;
+            
+            try {
+                const response = await fetch(`/api/meals?userId=${currentUser.id}`);
+                if (!response.ok) throw new Error('Failed to load meals');
+                const meals = await response.json();
+                
+                if (meals.length === 0) {
+                    document.getElementById('mealsList').innerHTML = '<p>暂无餐食记录</p>';
+                    return;
+                }
+                
+                document.getElementById('mealsList').innerHTML = meals.map(meal => `
+                    <div class="food-card">
+                        <h3>${meal.date} - ${meal.type}</h3>
+                        <p>${meal.name}</p>
+                        <div class="food-nutrients">
+                             <div class="nutrient"><span>卡路里:</span><span>${meal.calories.toFixed(0)}</span></div>
+                             <div class="nutrient"><span>蛋白质:</span><span>${meal.protein.toFixed(1)}</span></div>
+                             <div class="nutrient"><span>碳水:</span><span>${meal.carbs.toFixed(1)}</span></div>
+                             <div class="nutrient"><span>脂肪:</span><span>${meal.fat.toFixed(1)}</span></div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error(error);
+                document.getElementById('mealsList').innerHTML = '<p>加载记录失败</p>';
+            }
         }
         
         // 加载统计信息
-        function loadStatistics() {
-            document.getElementById('statisticsInfo').innerHTML = `
-                <div class="user-info">
-                    <h3>本周营养摄入统计</h3>
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <span>平均每日卡路里:</span>
-                            <span>1850 kcal</span>
-                        </div>
-                        <div class="info-item">
-                            <span>平均每日蛋白质:</span>
-                            <span>75 g</span>
-                        </div>
-                        <div class="info-item">
-                            <span>平均每日碳水:</span>
-                            <span>220 g</span>
-                        </div>
-                        <div class="info-item">
-                            <span>平均每日脂肪:</span>
-                            <span>65 g</span>
+        async function loadStatistics() {
+            if (!currentUser) return;
+            
+            try {
+                const response = await fetch(`/api/statistics?userId=${currentUser.id}`);
+                if (!response.ok) throw new Error('Failed to load stats');
+                const stats = await response.json();
+                
+                document.getElementById('statisticsInfo').innerHTML = `
+                    <div class="user-info">
+                        <h3>营养摄入统计 (平均/日)</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span>平均每日卡路里:</span>
+                                <span>${stats.avgCalories.toFixed(0)} kcal</span>
+                            </div>
+                            <div class="info-item">
+                                <span>平均每日蛋白质:</span>
+                                <span>${stats.avgProtein.toFixed(1)} g</span>
+                            </div>
+                            <div class="info-item">
+                                <span>平均每日碳水:</span>
+                                <span>${stats.avgCarbs.toFixed(1)} g</span>
+                            </div>
+                            <div class="info-item">
+                                <span>平均每日脂肪:</span>
+                                <span>${stats.avgFat.toFixed(1)} g</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
+                `;
+            } catch (error) {
+                console.error(error);
+                document.getElementById('statisticsInfo').innerHTML = '<p>加载统计失败</p>';
+            }
         }
     </script>
 </body>

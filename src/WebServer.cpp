@@ -1,12 +1,17 @@
 #include "WebServer.h"
+#include "Database.h"
+#include "RecommendationEngine.h"
+#include "User.h"
+#include "Food.h"
+#include "Meal.h"
 #include <iostream>
 #include <thread>
 #include <chrono>
 #include <sstream>
 #include <algorithm>
 #include <fstream>
-#include <sstream>
 #include <vector>
+#include <iomanip>
 
 // 跨平台的socket处理
 #ifdef _WIN32
@@ -22,7 +27,60 @@
     #define closesocket close
 #endif
 
-SimpleWebServer::SimpleWebServer(int port) : port(port), server_socket(INVALID_SOCKET), running(false) {}
+// Helper functions
+static std::string getQueryParam(const std::string& fullPath, const std::string& key) {
+    size_t queryPos = fullPath.find('?');
+    if (queryPos == std::string::npos) return "";
+    
+    std::string query = fullPath.substr(queryPos + 1);
+    std::stringstream ss(query);
+    std::string segment;
+    while (std::getline(ss, segment, '&')) {
+        size_t eqPos = segment.find('=');
+        if (eqPos != std::string::npos) {
+            std::string k = segment.substr(0, eqPos);
+            if (k == key) {
+                return segment.substr(eqPos + 1);
+            }
+        }
+    }
+    return "";
+}
+
+static std::string escapeJSON(const std::string& s) {
+    std::string res;
+    for (char c : s) {
+        if (c == '"') res += "\\\"";
+        else if (c == '\\') res += "\\\\";
+        else if (c == '\b') res += "\\b";
+        else if (c == '\f') res += "\\f";
+        else if (c == '\n') res += "\\n";
+        else if (c == '\r') res += "\\r";
+        else if (c == '\t') res += "\\t";
+        else res += c;
+    }
+    return res;
+}
+
+static std::string getJsonValue(const std::string& json, const std::string& key) {
+    std::string search = "\"" + key + "\"";
+    size_t pos = json.find(search);
+    if (pos == std::string::npos) return "";
+    
+    size_t colon = json.find(":", pos);
+    if (colon == std::string::npos) return "";
+    
+    size_t startValue = json.find("\"", colon);
+    if (startValue == std::string::npos) return "";
+    
+    size_t endValue = json.find("\"", startValue + 1);
+    if (endValue == std::string::npos) return "";
+    
+    return json.substr(startValue + 1, endValue - startValue - 1);
+}
+
+SimpleWebServer::SimpleWebServer(Database* db, RecommendationEngine* engine, int port) 
+    : db(db), engine(engine), port(port), server_socket(INVALID_SOCKET), running(false) {}
 
 SimpleWebServer::~SimpleWebServer() {
     cleanup();
@@ -111,8 +169,14 @@ void SimpleWebServer::handleClient(socket_t client_socket) {
 
 std::string SimpleWebServer::handleHttpRequest(const std::string& request) {
     std::istringstream stream(request);
-    std::string method, path, version;
-    stream >> method >> path >> version;
+    std::string method, fullPath, version;
+    stream >> method >> fullPath >> version;
+    
+    std::string path = fullPath;
+    size_t queryPos = fullPath.find('?');
+    if (queryPos != std::string::npos) {
+        path = fullPath.substr(0, queryPos);
+    }
     
     std::string response;
     
@@ -122,6 +186,16 @@ std::string SimpleWebServer::handleHttpRequest(const std::string& request) {
         response = handleLogin(request);
     } else if (path == "/api/register") {
         response = handleRegister(request);
+    } else if (path == "/api/profile") {
+        response = handleGetProfile(fullPath);
+    } else if (path == "/api/foods") {
+        response = handleGetFoods(request);
+    } else if (path == "/api/recommendations") {
+        response = handleGetRecommendations(fullPath);
+    } else if (path == "/api/meals") {
+        response = handleGetMeals(fullPath);
+    } else if (path == "/api/statistics") {
+        response = handleGetStatistics(fullPath);
     } else {
         response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\n404 Not Found";
     }
@@ -131,7 +205,6 @@ std::string SimpleWebServer::handleHttpRequest(const std::string& request) {
 
 std::string SimpleWebServer::serveIndexPage() {
     std::string html;
-    // 尝试多个可能的路径（包括VS2022调试和发布路径）
     std::vector<std::string> possiblePaths = {
         "index.html",
         "src/index.html",
@@ -165,22 +238,272 @@ std::string SimpleWebServer::serveIndexPage() {
 }
 
 std::string SimpleWebServer::handleLogin(const std::string& request) {
-    // 简单的登录验证逻辑
-    // 这里应该与C++的User类集成
-    std::string response_body = "{\"success\":true,\"user\":{\"username\":\"testuser\",\"age\":25,\"gender\":\"male\",\"height\":170,\"weight\":65,\"dailyCalorieGoal\":2000,\"dailyProteinGoal\":50,\"dailyCarbGoal\":250,\"dailyFatGoal\":65},\"message\":\"Login successful\"}";
+    size_t bodyPos = request.find("\r\n\r\n");
+    if (bodyPos == std::string::npos) return "HTTP/1.1 400 Bad Request\r\n\r\n";
+    std::string body = request.substr(bodyPos + 4);
     
-    std::string response = "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + 
-                          std::to_string(response_body.length()) + "\r\n\r\n" + response_body;
-    return response;
+    std::string username = getJsonValue(body, "username");
+    std::string password = getJsonValue(body, "password");
+    
+    auto users = db->getAllUsers();
+    User* foundUser = nullptr;
+    for (auto& user : users) {
+        if (user.getUsername() == username && user.getPassword() == password) {
+            foundUser = &user;
+            break;
+        }
+    }
+    
+    std::string response_body;
+    if (foundUser) {
+        response_body = "{\"success\":true,\"user\":{\"id\":" + std::to_string(foundUser->getId()) + 
+                        ",\"username\":\"" + escapeJSON(foundUser->getUsername()) + "\"" +
+                        ",\"age\":" + std::to_string(foundUser->getAge()) +
+                        ",\"gender\":\"" + escapeJSON(foundUser->getGender()) + "\"" +
+                        ",\"height\":" + std::to_string(foundUser->getHeight()) +
+                        ",\"weight\":" + std::to_string(foundUser->getWeight()) +
+                        ",\"dailyCalorieGoal\":" + std::to_string(foundUser->getDailyCalorieGoal()) +
+                        ",\"dailyProteinGoal\":" + std::to_string(foundUser->getDailyProteinGoal()) +
+                        ",\"dailyCarbGoal\":" + std::to_string(foundUser->getDailyCarbGoal()) +
+                        ",\"dailyFatGoal\":" + std::to_string(foundUser->getDailyFatGoal()) +
+                        "},\"message\":\"Login successful\"}";
+    } else {
+        response_body = "{\"success\":false,\"message\":\"Invalid username or password\"}";
+    }
+    
+    return "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + 
+           std::to_string(response_body.length()) + "\r\n\r\n" + response_body;
 }
 
 std::string SimpleWebServer::handleRegister(const std::string& request) {
-    // 简单的注册逻辑
-    std::string response_body = "{\"success\":true,\"message\":\"Registration successful\"}";
+    size_t bodyPos = request.find("\r\n\r\n");
+    if (bodyPos == std::string::npos) return "HTTP/1.1 400 Bad Request\r\n\r\n";
+    std::string body = request.substr(bodyPos + 4);
     
-    std::string response = "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + 
-                          std::to_string(response_body.length()) + "\r\n\r\n" + response_body;
-    return response;
+    std::string username = getJsonValue(body, "username");
+    std::string password = getJsonValue(body, "password");
+    
+    if (username.empty() || password.empty()) {
+        std::string response_body = "{\"success\":false,\"message\":\"Username and password required\"}";
+        return "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + 
+               std::to_string(response_body.length()) + "\r\n\r\n" + response_body;
+    }
+    
+    auto users = db->getAllUsers();
+    for (const auto& user : users) {
+        if (user.getUsername() == username) {
+            std::string response_body = "{\"success\":false,\"message\":\"Username already exists\"}";
+            return "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + 
+                   std::to_string(response_body.length()) + "\r\n\r\n" + response_body;
+        }
+    }
+    
+    User newUser;
+    newUser.setId(db->getNextUserId());
+    newUser.setUsername(username);
+    newUser.setPassword(password);
+    // Default values
+    newUser.setAge(25);
+    newUser.setGender("Other");
+    newUser.setHeight(170);
+    newUser.setWeight(65);
+    newUser.calculateNutritionGoals();
+    
+    db->saveUser(newUser);
+    
+    std::string response_body = "{\"success\":true,\"message\":\"Registration successful\"}";
+    return "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + 
+           std::to_string(response_body.length()) + "\r\n\r\n" + response_body;
+}
+
+std::string SimpleWebServer::handleGetProfile(const std::string& request) {
+    std::string userIdStr = getQueryParam(request, "userId");
+    if (userIdStr.empty()) return "HTTP/1.1 400 Bad Request\r\n\r\n";
+    
+    int userId = std::stoi(userIdStr);
+    auto userOpt = db->getUserById(userId);
+    
+    if (!userOpt) {
+        return "HTTP/1.1 404 Not Found\r\n\r\n";
+    }
+    
+    User user = *userOpt;
+    std::string response_body = "{\"success\":true,\"user\":{\"id\":" + std::to_string(user.getId()) + 
+                        ",\"username\":\"" + escapeJSON(user.getUsername()) + "\"" +
+                        ",\"age\":" + std::to_string(user.getAge()) +
+                        ",\"gender\":\"" + escapeJSON(user.getGender()) + "\"" +
+                        ",\"height\":" + std::to_string(user.getHeight()) +
+                        ",\"weight\":" + std::to_string(user.getWeight()) +
+                        ",\"dailyCalorieGoal\":" + std::to_string(user.getDailyCalorieGoal()) +
+                        ",\"dailyProteinGoal\":" + std::to_string(user.getDailyProteinGoal()) +
+                        ",\"dailyCarbGoal\":" + std::to_string(user.getDailyCarbGoal()) +
+                        ",\"dailyFatGoal\":" + std::to_string(user.getDailyFatGoal()) +
+                        "}}";
+                        
+    return "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + 
+           std::to_string(response_body.length()) + "\r\n\r\n" + response_body;
+}
+
+std::string SimpleWebServer::handleGetFoods(const std::string& request) {
+    auto foods = db->getAllFoods();
+    std::stringstream ss;
+    ss << "[";
+    for (size_t i = 0; i < foods.size(); ++i) {
+        const auto& food = foods[i];
+        ss << "{\"id\":" << food.getId() 
+           << ",\"name\":\"" << escapeJSON(food.getName()) << "\""
+           << ",\"calories\":" << food.getCalories()
+           << ",\"protein\":" << food.getProtein()
+           << ",\"carbs\":" << food.getCarbohydrates()
+           << ",\"fat\":" << food.getFat()
+           << ",\"tags\":[";
+           
+        auto tags = food.getTags();
+        int t = 0;
+        for (const auto& tag : tags) {
+            if (t > 0) ss << ",";
+            ss << "\"" << escapeJSON(tag) << "\"";
+            t++;
+        }
+        ss << "]}";
+        
+        if (i < foods.size() - 1) ss << ",";
+    }
+    ss << "]";
+    
+    std::string response_body = ss.str();
+    return "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + 
+           std::to_string(response_body.length()) + "\r\n\r\n" + response_body;
+}
+
+std::string SimpleWebServer::handleGetRecommendations(const std::string& request) {
+    std::string userIdStr = getQueryParam(request, "userId");
+    if (userIdStr.empty()) return "HTTP/1.1 400 Bad Request\r\n\r\n";
+    
+    int userId = std::stoi(userIdStr);
+    auto userOpt = db->getUserById(userId);
+    
+    if (!userOpt) return "HTTP/1.1 404 Not Found\r\n\r\n";
+    
+    std::time_t t = std::time(nullptr);
+    char dateBuf[128];
+    std::strftime(dateBuf, sizeof(dateBuf), "%Y-%m-%d", std::localtime(&t));
+    
+    auto meals = engine->recommendDailyMeals(*userOpt, dateBuf);
+    
+    std::stringstream ss;
+    ss << "[";
+    for (size_t i = 0; i < meals.size(); ++i) {
+        const auto& meal = meals[i];
+        
+        std::string mealName;
+        auto foods = meal.getFoods();
+        for(size_t j=0; j<foods.size(); ++j) {
+            if(j>0) mealName += " + ";
+            mealName += foods[j].getName();
+        }
+
+        ss << "{\"id\":" << meal.getId() 
+           << ",\"name\":\"" << escapeJSON(mealName) << "\""
+           << ",\"type\":\"" << escapeJSON(meal.getMealType()) << "\""
+           << ",\"calories\":" << meal.getTotalCalories()
+           << ",\"items\":[";
+           
+        for (size_t j = 0; j < foods.size(); ++j) {
+            if (j > 0) ss << ",";
+            ss << "\"" << escapeJSON(foods[j].getName()) << "\"";
+        }
+        ss << "]}";
+        
+        if (i < meals.size() - 1) ss << ",";
+    }
+    ss << "]";
+    
+    std::string response_body = ss.str();
+    return "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + 
+           std::to_string(response_body.length()) + "\r\n\r\n" + response_body;
+}
+
+std::string SimpleWebServer::handleGetMeals(const std::string& request) {
+    std::string userIdStr = getQueryParam(request, "userId");
+    if (userIdStr.empty()) return "HTTP/1.1 400 Bad Request\r\n\r\n";
+    
+    int userId = std::stoi(userIdStr);
+    auto meals = db->getMealsByUser(userId);
+    
+    std::stringstream ss;
+    ss << "[";
+    for (size_t i = 0; i < meals.size(); ++i) {
+        const auto& meal = meals[i];
+        
+        std::string mealName;
+        auto foods = meal.getFoods();
+        for(size_t j=0; j<foods.size(); ++j) {
+            if(j>0) mealName += " + ";
+            mealName += foods[j].getName();
+        }
+        
+        ss << "{\"id\":" << meal.getId() 
+           << ",\"name\":\"" << escapeJSON(mealName) << "\""
+           << ",\"type\":\"" << escapeJSON(meal.getMealType()) << "\""
+           << ",\"date\":\"" << escapeJSON(meal.getDate()) << "\""
+           << ",\"calories\":" << meal.getTotalCalories()
+           << ",\"protein\":" << meal.getTotalProtein()
+           << ",\"carbs\":" << meal.getTotalCarbs()
+           << ",\"fat\":" << meal.getTotalFat()
+           << "}";
+        
+        if (i < meals.size() - 1) ss << ",";
+    }
+    ss << "]";
+    
+    std::string response_body = ss.str();
+    return "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + 
+           std::to_string(response_body.length()) + "\r\n\r\n" + response_body;
+}
+
+std::string SimpleWebServer::handleGetStatistics(const std::string& request) {
+    std::string userIdStr = getQueryParam(request, "userId");
+    if (userIdStr.empty()) return "HTTP/1.1 400 Bad Request\r\n\r\n";
+    
+    int userId = std::stoi(userIdStr);
+    auto meals = db->getMealsByUser(userId);
+    
+    double avgCal = 0, avgProt = 0, avgCarb = 0, avgFat = 0;
+    if (!meals.empty()) {
+        double totalCal = 0, totalProt = 0, totalCarb = 0, totalFat = 0;
+        for (const auto& meal : meals) {
+            totalCal += meal.getTotalCalories();
+            totalProt += meal.getTotalProtein();
+            totalCarb += meal.getTotalCarbs();
+            totalFat += meal.getTotalFat();
+        }
+        // Assuming meals are stored individually, we might want to group by day. 
+        // For simplicity, let's just average per meal or if we assume 3 meals a day, we can estimate daily.
+        // Actually the frontend expects daily average.
+        // Let's count unique days.
+        std::set<std::string> days;
+        for(const auto& meal : meals) days.insert(meal.getDate());
+        
+        int dayCount = days.size();
+        if (dayCount == 0) dayCount = 1;
+        
+        avgCal = totalCal / dayCount;
+        avgProt = totalProt / dayCount;
+        avgCarb = totalCarb / dayCount;
+        avgFat = totalFat / dayCount;
+    }
+    
+    std::stringstream ss;
+    ss << "{\"avgCalories\":" << avgCal
+       << ",\"avgProtein\":" << avgProt
+       << ",\"avgCarbs\":" << avgCarb
+       << ",\"avgFat\":" << avgFat
+       << "}";
+       
+    std::string response_body = ss.str();
+    return "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + 
+           std::to_string(response_body.length()) + "\r\n\r\n" + response_body;
 }
 
 void SimpleWebServer::cleanup() {
@@ -192,9 +515,8 @@ void SimpleWebServer::cleanup() {
 #endif
 }
 
-// 导出SimpleWebServer类供外部使用
-SimpleWebServer* CreateWebServer(int port) {
-    return new SimpleWebServer(port);
+SimpleWebServer* CreateWebServer(Database* db, RecommendationEngine* engine, int port) {
+    return new SimpleWebServer(db, engine, port);
 }
 
 void DeleteWebServer(SimpleWebServer* server) {

@@ -4,6 +4,9 @@
 #include <string>
 #include <atomic>
 
+class Database;
+class RecommendationEngine;
+
 // 跨平台的socket处理
 #ifdef _WIN32
     #include <winsock2.h>
@@ -24,9 +27,11 @@ private:
     int port;
     socket_t server_socket;
     std::atomic<bool> running;
+    Database* db;
+    RecommendationEngine* engine;
 
 public:
-    SimpleWebServer(int port = 8080);
+    SimpleWebServer(Database* db, RecommendationEngine* engine, int port = 8080);
     ~SimpleWebServer();
     
     void start();
@@ -40,11 +45,16 @@ private:
     std::string serveIndexPage();
     std::string handleLogin(const std::string& request);
     std::string handleRegister(const std::string& request);
+    std::string handleGetProfile(const std::string& request);
+    std::string handleGetFoods(const std::string& request);
+    std::string handleGetRecommendations(const std::string& request);
+    std::string handleGetMeals(const std::string& request);
+    std::string handleGetStatistics(const std::string& request);
     void cleanup();
 };
 
 // 导出SimpleWebServer类供外部使用
-SimpleWebServer* CreateWebServer(int port);
+SimpleWebServer* CreateWebServer(Database* db, RecommendationEngine* engine, int port);
 void DeleteWebServer(SimpleWebServer* server);
 
 #endif // WEBSERVER_H
