@@ -273,6 +273,24 @@ bool Database::deleteMeal(int mealId) {
     return false;
 }
 
+int Database::deleteMealsByDateAndUser(const std::string& date, int userId) {
+    int deletedCount = 0;
+    for (auto it = meals.begin(); it != meals.end();) {
+        if (it->getDate() == date && it->getUserId() == userId) {
+            it = meals.erase(it);
+            ++deletedCount;
+        } else {
+            ++it;
+        }
+    }
+
+    if (deletedCount == 0) {
+        return 0;
+    }
+
+    return saveMeals() ? deletedCount : -1;
+}
+
 bool Database::saveMeals() {
     std::ofstream file(mealsFile);
     if (!file.is_open()) {
@@ -327,6 +345,15 @@ std::vector<Meal> Database::getMealsByDateAndUser(const std::string& date, int u
         }
     }
     return result;
+}
+
+std::optional<Meal> Database::getMealById(int id) const {
+    for (const auto& meal : meals) {
+        if (meal.getId() == id) {
+            return meal;
+        }
+    }
+    return std::nullopt;
 }
 
 std::optional<Food> Database::getFoodById(int id) const {

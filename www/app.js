@@ -314,7 +314,14 @@ function displayHistory(meals) {
             
             return `
                 <div style="margin-bottom: 30px;">
-                    <h3 style="color: #333; margin-bottom: 15px; font-size: 20px;">📅 ${date}</h3>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 15px;">
+                        <h3 style="color: #333; margin: 0; font-size: 20px;">📅 ${date}</h3>
+                        <button onclick="deleteMealsByDate('${date}')" style="
+                            background: #ff4757; color: white; border: none;
+                            padding: 8px 12px; border-radius: 8px; cursor: pointer;
+                            font-size: 13px; flex-shrink: 0;
+                        " title="删除当天所有餐单">🗑️ 删除当天</button>
+                    </div>
                     <div style="display: grid; gap: 15px;">
                         ${dateMeals.map(meal => createMealCard(meal, true)).join('')}
                     </div>
@@ -421,24 +428,27 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
     }
 });
 
-document.getElementById('checkDateBtn').addEventListener('click', async () => {
-    const date = document.getElementById('recommendDate').value;
-    if (!date) {
-        showToast('请选择日期', 'error');
-        return;
-    }
-    
-    const result = await apiCall(`/api/meals/check-date?date=${date}`);
-    if (result && result.data) {
-        if (result.data.hasExisting) {
-            showConfirmDialog('此日期已有保存的餐单，是否替换为新的推荐？', async () => {
-                await saveRecommendation(date, true);
-            });
-        } else {
-            await saveRecommendation(date, false);
+const checkDateBtn = document.getElementById('checkDateBtn');
+if (checkDateBtn) {
+    checkDateBtn.addEventListener('click', async () => {
+        const date = document.getElementById('recommendDate').value;
+        if (!date) {
+            showToast('请选择日期', 'error');
+            return;
         }
-    }
-});
+        
+        const result = await apiCall(`/api/meals/check-date?date=${date}`);
+        if (result && result.data) {
+            if (result.data.hasExisting) {
+                showConfirmDialog('此日期已有保存的餐单，是否替换为新的推荐？', async () => {
+                    await saveRecommendation(date, true);
+                });
+            } else {
+                await saveRecommendation(date, false);
+            }
+        }
+    });
+}
 
 async function saveRecommendation(date, replaceExisting) {
     const result = await apiCall('/api/meals/save', {
@@ -519,11 +529,8 @@ function displayRecommendation(meals, date) {
             <h3 style="font-size: 24px; margin-bottom: 10px;">✨ 为您精心推荐</h3>
             <p style="opacity: 0.9; margin-bottom: 20px;">${date} 的营养配餐方案</p>
             <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-                <button id="checkAndSaveBtn" class="btn-primary" style="background: white; color: #43e97b; max-width: 180px; margin: 0 auto;">
-                    💾 保存/替换餐单
-                </button>
-                <button id="saveRecommendBtn" class="btn-primary" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); max-width: 150px; margin: 0 auto;">
-                    📋 直接保存
+                <button id="saveRecommendationBtn" class="btn-primary" style="background: white; color: #43e97b; max-width: 180px; margin: 0 auto;">
+                    💾 保存餐单
                 </button>
             </div>
         </div>
@@ -559,19 +566,8 @@ function displayRecommendation(meals, date) {
         </div>
     `;
     
-    document.getElementById('saveRecommendBtn').addEventListener('click', async () => {
-        const result = await apiCall('/api/meals/save', {
-            method: 'POST',
-            body: JSON.stringify({ date })
-        });
-        
-        if (result) {
-            showToast('推荐已保存到历史记录！');
-        }
-    });
-    
-    document.getElementById('checkAndSaveBtn').addEventListener('click', async () => {
-        const result = await apiCall(`/api/meals/check-date?date=${date}`);
+    document.getElementById('saveRecommendationBtn').addEventListener('click', async () => {
+        const result = await apiCall(`/api/meals/check-date?date=${encodeURIComponent(date)}`);
         if (result && result.data) {
             if (result.data.hasExisting) {
                 showConfirmDialog('此日期已有保存的餐单，是否替换为新的推荐？', async () => {
@@ -594,7 +590,22 @@ async function deleteMeal(mealId, mealDate, mealType) {
             
             if (result) {
                 showToast('餐单删除成功！');
-                // 重新加载历史记录
+                loadHistory();
+            }
+        }
+    );
+}
+
+async function deleteMealsByDate(mealDate) {
+    showConfirmDialog(
+        `确定要删除 ${mealDate} 当天的所有餐单吗？此操作不可恢复。`,
+        async () => {
+            const result = await apiCall(`/api/meals/by-date?date=${encodeURIComponent(mealDate)}`, {
+                method: 'DELETE'
+            });
+            
+            if (result) {
+                showToast(result.message || '当天餐单已删除！');
                 loadHistory();
             }
         }

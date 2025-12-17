@@ -27,12 +27,7 @@ WebServer::WebServer(int port, const std::string& wwwRoot)
     db.loadMeals();
     
     engine.setFoodDatabase(db.getAllFoods());
-    
-    std::map<int, std::vector<Meal>> allHistory;
-    for (const auto& meal : db.getAllMeals()) {
-        allHistory[meal.getUserId()].push_back(meal);
-    }
-    engine.loadHistory(allHistory);
+    reloadEngineHistory();
 }
 
 std::string WebServer::generateSessionToken() {
@@ -235,6 +230,14 @@ std::string WebServer::mealsArrayToJson(const std::vector<Meal>& meals) {
     return ss.str();
 }
 
+void WebServer::reloadEngineHistory() {
+    std::map<int, std::vector<Meal>> allHistory;
+    for (const auto& meal : db.getAllMeals()) {
+        allHistory[meal.getUserId()].push_back(meal);
+    }
+    engine.loadHistory(allHistory);
+}
+
 void WebServer::openBrowser(const std::string& url) {
 #ifdef _WIN32
     ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
@@ -428,13 +431,18 @@ void WebServer::start() {
         
         User& user = sessions[token];
         std::string date = parseJsonString(req.body, "date");
+        if (date.empty()) {
+            res.set_content(createJsonResponse(false, u8"缺少日期参数"), "application/json; charset=utf-8");
+            return;
+        }
+
         bool replaceExisting = parseJsonInt(req.body, "replaceExisting") == 1;
         
-        // 如果需要替换，先删除当天的现有餐单
         if (replaceExisting) {
-            auto existingMeals = db.getMealsByDateAndUser(date, user.getId());
-            for (const auto& meal : existingMeals) {
-                db.deleteMeal(meal.getId());
+            int deletedCount = db.deleteMealsByDateAndUser(date, user.getId());
+            if (deletedCount < 0) {
+                res.set_content(createJsonResponse(false, u8"删除旧餐单失败"), "application/json; charset=utf-8");
+                return;
             }
         }
         
@@ -443,11 +451,43 @@ void WebServer::start() {
             meal.setId(db.getNextMealId());
             meal.setUserId(user.getId());
             db.saveMeal(meal);
-            engine.addToHistory(user.getId(), meal);
         }
+
+        reloadEngineHistory();
         
         std::string message = replaceExisting ? u8"餐单替换保存成功" : u8"餐单保存成功";
         res.set_content(createJsonResponse(true, message), "application/json; charset=utf-8");
+    });
+
+    svr.Delete("/api/meals/by-date", [this](const httplib::Request& req, httplib::Response& res) {
+        std::string token = req.get_header_value("Authorization");
+        if (token.find("Bearer ") == 0) {
+            token = token.substr(7);
+        }
+
+        if (sessions.find(token) == sessions.end()) {
+            res.set_content(createJsonResponse(false, u8"未登录或会话已过期"), "application/json; charset=utf-8");
+            return;
+        }
+
+        User& user = sessions[token];
+        std::string date = req.has_param("date") ? req.get_param_value("date") : "";
+        if (date.empty()) {
+            res.set_content(createJsonResponse(false, u8"缺少日期参数"), "application/json; charset=utf-8");
+            return;
+        }
+
+        int deletedCount = db.deleteMealsByDateAndUser(date, user.getId());
+        if (deletedCount < 0) {
+            res.set_content(createJsonResponse(false, u8"删除失败"), "application/json; charset=utf-8");
+            return;
+        }
+
+        reloadEngineHistory();
+
+        std::string data = std::string("{\"deletedCount\":") + std::to_string(deletedCount) + "}";
+        std::string message2 = deletedCount == 0 ? u8"当天没有可删除的餐单" : u8"当天餐单删除成功";
+        res.set_content(createJsonResponse(true, message2, data), "application/json; charset=utf-8");
     });
     
     svr.Delete(R"(/api/meals/(\d+))", [this](const httplib::Request& req, httplib::Response& res) {
@@ -461,9 +501,27 @@ void WebServer::start() {
             return;
         }
         
+        User& user = sessions[token];
         int mealId = std::stoi(req.matches[1]);
-        db.deleteMeal(mealId);
-        
+
+        auto meal = db.getMealById(mealId);
+        if (!meal) {
+            res.set_content(createJsonResponse(false, u8"餐单不存在"), "application/json; charset=utf-8");
+            return;
+        }
+
+        if (meal->getUserId() != user.getId()) {
+            res.set_content(createJsonResponse(false, u8"无权限删除该餐单"), "application/json; charset=utf-8");
+            return;
+        }
+
+        if (!db.deleteMeal(mealId)) {
+            res.set_content(createJsonResponse(false, u8"删除失败"), "application/json; charset=utf-8");
+            return;
+        }
+
+        reloadEngineHistory();
+
         res.set_content(createJsonResponse(true, u8"删除成功"), "application/json; charset=utf-8");
     });
     
