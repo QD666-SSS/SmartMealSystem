@@ -1,4 +1,4 @@
-﻿#ifndef USER_H
+#ifndef USER_H
 #define USER_H
 
 #include <string>
@@ -64,6 +64,9 @@ public:
     void addPreferredTag(const std::string& tag);
     void addAvoidedTag(const std::string& tag);
     void addAllergen(const std::string& allergen);
+    void removePreferredTag(const std::string& tag);
+    void removeAvoidedTag(const std::string& tag);
+    void removeAllergen(const std::string& allergen);
     
     void calculateNutritionGoals();
     void displayProfile() const;

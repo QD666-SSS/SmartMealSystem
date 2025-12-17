@@ -34,6 +34,8 @@ double RecommendationEngine::calculateFoodScore(const Food& food, const User& us
                                                  double remainingProtein,
                                                  double remainingCarbs,
                                                  double remainingFat) const {
+    (void)mealType;
+    
     double score = 100.0;
     
     if (!isAllergenFree(food, user)) {
@@ -80,14 +82,25 @@ double RecommendationEngine::calculateFoodScore(const Food& food, const User& us
     auto history = userHistory.find(user.getId());
     if (history != userHistory.end()) {
         int recentCount = 0;
-        for (const auto& pastMeal : history->second) {
-            for (const auto& pastFood : pastMeal.getFoods()) {
-                if (pastFood.getId() == food.getId()) {
-                    recentCount++;
+        int historySize = history->second.size();
+        int recentLimit = std::min(10, historySize);
+        
+        for (int i = historySize - recentLimit; i < historySize; ++i) {
+            if (i >= 0) {
+                const auto& pastMeal = history->second[i];
+                for (const auto& pastFood : pastMeal.getFoods()) {
+                    if (pastFood.getId() == food.getId()) {
+                        recentCount++;
+                    }
                 }
             }
         }
-        score -= recentCount * 10.0;
+        score -= recentCount * 15.0;
+        
+        if (recentCount > 0 && recentLimit > 0) {
+            double recencyWeight = static_cast<double>(recentCount) / recentLimit;
+            score -= recencyWeight * 20.0;
+        }
     }
     
     return score;
@@ -115,27 +128,47 @@ Meal RecommendationEngine::recommendMeal(const User& user, const std::string& me
     double remainingFat = targetFat;
     
     std::vector<std::string> categories;
+    std::map<std::string, double> categoryWeights;
+    
     if (mealType == "breakfast") {
-        categories = {u8"主食", u8"蛋类"};
+        categories = {u8"主食", u8"蛋类", u8"奶制品", u8"水果"};
+        categoryWeights[u8"主食"] = 0.4;
+        categoryWeights[u8"蛋类"] = 0.3;
+        categoryWeights[u8"奶制品"] = 0.2;
+        categoryWeights[u8"水果"] = 0.1;
     } else if (mealType == "lunch") {
         categories = {u8"主食", u8"肉类", u8"蔬菜"};
+        categoryWeights[u8"主食"] = 0.35;
+        categoryWeights[u8"肉类"] = 0.4;
+        categoryWeights[u8"蔬菜"] = 0.25;
     } else if (mealType == "dinner") {
-        categories = {u8"主食", u8"蔬菜", u8"豆制品"};
+        categories = {u8"主食", u8"蔬菜", u8"豆制品", u8"肉类"};
+        categoryWeights[u8"主食"] = 0.3;
+        categoryWeights[u8"蔬菜"] = 0.3;
+        categoryWeights[u8"豆制品"] = 0.25;
+        categoryWeights[u8"肉类"] = 0.15;
     } else {
         categories = {u8"水果", u8"坚果"};
+        categoryWeights[u8"水果"] = 0.7;
+        categoryWeights[u8"坚果"] = 0.3;
     }
     
     for (const auto& category : categories) {
         std::vector<Food> categoryFoods = filterFoodsByCategory(category);
         if (categoryFoods.empty()) continue;
         
+        double categoryCalTarget = targetCalories * categoryWeights[category];
+        double categoryProtTarget = targetProtein * categoryWeights[category];
+        double categoryCarbTarget = targetCarbs * categoryWeights[category];
+        double categoryFatTarget = targetFat * categoryWeights[category];
+        
         std::vector<std::pair<double, Food>> scoredFoods;
         for (const auto& food : categoryFoods) {
             double score = calculateFoodScore(food, user, mealType,
-                                             remainingCalories / categories.size(),
-                                             remainingProtein / categories.size(),
-                                             remainingCarbs / categories.size(),
-                                             remainingFat / categories.size());
+                                             categoryCalTarget,
+                                             categoryProtTarget,
+                                             categoryCarbTarget,
+                                             categoryFatTarget);
             if (score > -500) {
                 scoredFoods.push_back({score, food});
             }
@@ -145,11 +178,23 @@ Meal RecommendationEngine::recommendMeal(const User& user, const std::string& me
             std::sort(scoredFoods.begin(), scoredFoods.end(),
                      [](const auto& a, const auto& b) { return a.first > b.first; });
             
-            meal.addFood(scoredFoods[0].second);
-            remainingCalories -= scoredFoods[0].second.getCalories();
-            remainingProtein -= scoredFoods[0].second.getProtein();
-            remainingCarbs -= scoredFoods[0].second.getCarbohydrates();
-            remainingFat -= scoredFoods[0].second.getFat();
+            size_t topChoices = std::min(static_cast<size_t>(3), scoredFoods.size());
+            size_t selectedIndex = 0;
+            
+            if (topChoices > 1) {
+                for (size_t i = 1; i < topChoices; ++i) {
+                    if (scoredFoods[i].first >= scoredFoods[0].first * 0.9) {
+                        selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+            
+            meal.addFood(scoredFoods[selectedIndex].second);
+            remainingCalories -= scoredFoods[selectedIndex].second.getCalories();
+            remainingProtein -= scoredFoods[selectedIndex].second.getProtein();
+            remainingCarbs -= scoredFoods[selectedIndex].second.getCarbohydrates();
+            remainingFat -= scoredFoods[selectedIndex].second.getFat();
         }
     }
     

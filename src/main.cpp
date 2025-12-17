@@ -32,6 +32,12 @@ public:
         
         engine.setFoodDatabase(db.getAllFoods());
         
+        std::map<int, std::vector<Meal>> allHistory;
+        for (const auto& meal : db.getAllMeals()) {
+            allHistory[meal.getUserId()].push_back(meal);
+        }
+        engine.loadHistory(allHistory);
+        
         showWelcome();
         
         while (true) {
@@ -326,7 +332,7 @@ private:
         
         int choice = Utils::getIntInput(u8"选择类别 (1-" + std::to_string(categoryList.size()) + u8"): ");
         
-        if (choice >= 1 && choice <= categoryList.size()) {
+        if (choice >= 1 && choice <= static_cast<int>(categoryList.size())) {
              std::string selectedCategory = categoryList[choice-1];
              std::cout << u8"\n=== " << selectedCategory << u8" ===" << std::endl;
             
@@ -368,20 +374,26 @@ private:
 
          auto recommendation = engine.recommendDailyMeals(getCurrentUser(), date);
 
-         std::cout << u8"\n推荐餐单已生成！" << std::endl;
-         std::cout << u8"是否保存此推荐？ (y/n): ";
+         std::cout << u8"\n=== 推荐餐单详情 ===" << std::endl;
+         for (const auto& meal : recommendation) {
+             meal.displayMeal();
+         }
+
+         engine.displayRecommendationStats(recommendation);
+
+         std::cout << u8"\n是否保存此推荐？ (y/n): ";
          std::string saveChoice;
          std::cin >> saveChoice;
 
          if (saveChoice == "y" || saveChoice == "Y") {
              for (auto& meal : recommendation) {
+                 meal.setId(db.getNextMealId());
                  meal.setUserId(getCurrentUser().getId());
                  db.saveMeal(meal);
+                 engine.addToHistory(getCurrentUser().getId(), meal);
              }
              std::cout << u8"推荐餐单已保存！" << std::endl;
          }
-
-         engine.displayRecommendationStats(recommendation);
      }
 
     void manageMealHistory() {
@@ -392,21 +404,343 @@ private:
              return;
          }
 
-         std::cout << u8"\n=== 历史餐单管理 ===" << std::endl;
+         while (true) {
+             std::cout << u8"\n=== 历史餐单管理 ===" << std::endl;
+             std::cout << u8"1. 查看所有历史餐单" << std::endl;
+             std::cout << u8"2. 查看特定日期的餐单" << std::endl;
+             std::cout << u8"3. 删除餐单" << std::endl;
+             std::cout << u8"4. 编辑餐单" << std::endl;
+             std::cout << u8"5. 对比营养目标" << std::endl;
+             std::cout << u8"0. 返回主菜单" << std::endl;
+
+             int choice = Utils::getIntInput(u8"选择 (0-5): ");
+
+             switch (choice) {
+                 case 1:
+                     viewAllMealHistory();
+                     break;
+                 case 2:
+                     viewMealsByDate();
+                     break;
+                 case 3:
+                     deleteMealFromHistory();
+                     break;
+                 case 4:
+                     editMealFromHistory();
+                     break;
+                 case 5:
+                     compareWithGoals();
+                     break;
+                 case 0:
+                     return;
+                 default:
+                     std::cout << u8"无效选择！" << std::endl;
+             }
+         }
+     }
+
+     void viewAllMealHistory() {
+         auto meals = db.getMealsByUser(getCurrentUser().getId());
+
+         std::cout << u8"\n=== 所有历史餐单 ===" << std::endl;
 
          std::map<std::string, std::vector<Meal>> mealsByDate;
          for (const auto& meal : meals) {
              mealsByDate[meal.getDate()].push_back(meal);
          }
 
-         std::cout << u8"找到 " << meals.size() << u8" 个餐单记录，按日期分组显示:" << std::endl;
+         std::cout << u8"找到 " << meals.size() << u8" 个餐单记录" << std::endl;
 
          for (const auto& dateGroup : mealsByDate) {
-             std::cout << u8"\n=== " << dateGroup.first << u8" ===" << std::endl;
+             std::cout << u8"\n=== 日期: " << dateGroup.first << u8" ===" << std::endl;
+             
+             double dayCalories = 0, dayProtein = 0, dayCarbs = 0, dayFat = 0;
              for (const auto& meal : dateGroup.second) {
                  meal.displayMeal();
+                 dayCalories += meal.getTotalCalories();
+                 dayProtein += meal.getTotalProtein();
+                 dayCarbs += meal.getTotalCarbs();
+                 dayFat += meal.getTotalFat();
+             }
+             
+             std::cout << u8"\n当日总计: " 
+                       << std::fixed << std::setprecision(1)
+                       << dayCalories << u8" kcal, "
+                       << dayProtein << u8" g 蛋白质, "
+                       << dayCarbs << u8" g 碳水, "
+                       << dayFat << u8" g 脂肪" << std::endl;
+             
+             std::cout << u8"目标完成度: "
+                       << (dayCalories / getCurrentUser().getDailyCalorieGoal() * 100) << u8"% 热量, "
+                       << (dayProtein / getCurrentUser().getDailyProteinGoal() * 100) << u8"% 蛋白质"
+                       << std::endl;
+         }
+     }
+
+     void viewMealsByDate() {
+         std::string date = Utils::getStringInput(u8"请输入日期 (格式: YYYY-MM-DD): ");
+         auto meals = db.getMealsByDate(date);
+
+         if (meals.empty()) {
+             std::cout << u8"\n该日期没有餐单记录。" << std::endl;
+             return;
+         }
+
+         std::cout << u8"\n=== " << date << u8" 的餐单 ===" << std::endl;
+         
+         double dayCalories = 0, dayProtein = 0, dayCarbs = 0, dayFat = 0;
+         for (const auto& meal : meals) {
+             if (meal.getUserId() == getCurrentUser().getId()) {
+                 meal.displayMeal();
+                 dayCalories += meal.getTotalCalories();
+                 dayProtein += meal.getTotalProtein();
+                 dayCarbs += meal.getTotalCarbs();
+                 dayFat += meal.getTotalFat();
              }
          }
+         
+         std::cout << u8"\n=== 营养汇总 ===" << std::endl;
+         std::cout << u8"总热量: " << std::fixed << std::setprecision(1) 
+                   << dayCalories << u8" / " << getCurrentUser().getDailyCalorieGoal() 
+                   << u8" kcal (" << (dayCalories / getCurrentUser().getDailyCalorieGoal() * 100) 
+                   << u8"%)" << std::endl;
+         std::cout << u8"蛋白质: " << dayProtein << u8" / " << getCurrentUser().getDailyProteinGoal() 
+                   << u8" g (" << (dayProtein / getCurrentUser().getDailyProteinGoal() * 100) 
+                   << u8"%)" << std::endl;
+         std::cout << u8"碳水化合物: " << dayCarbs << u8" / " << getCurrentUser().getDailyCarbGoal() 
+                   << u8" g (" << (dayCarbs / getCurrentUser().getDailyCarbGoal() * 100) 
+                   << u8"%)" << std::endl;
+         std::cout << u8"脂肪: " << dayFat << u8" / " << getCurrentUser().getDailyFatGoal() 
+                   << u8" g (" << (dayFat / getCurrentUser().getDailyFatGoal() * 100) 
+                   << u8"%)" << std::endl;
+     }
+
+     void deleteMealFromHistory() {
+         auto meals = db.getMealsByUser(getCurrentUser().getId());
+         
+         if (meals.empty()) {
+             std::cout << u8"\n暂无餐单可删除。" << std::endl;
+             return;
+         }
+
+         std::cout << u8"\n=== 删除餐单 ===" << std::endl;
+         
+         for (size_t i = 0; i < meals.size(); ++i) {
+             std::cout << (i + 1) << ". ";
+             std::cout << u8"[" << meals[i].getDate() << u8"] " 
+                       << meals[i].getMealType() << u8" - " 
+                       << meals[i].getTotalCalories() << u8" kcal" << std::endl;
+         }
+
+         int choice = Utils::getIntInput(u8"\n选择要删除的餐单 (0取消): ");
+         
+         if (choice > 0 && choice <= static_cast<int>(meals.size())) {
+             std::cout << u8"确认删除该餐单？ (y/n): ";
+             std::string confirm;
+             std::cin >> confirm;
+             
+             if (confirm == "y" || confirm == "Y") {
+                 if (db.deleteMeal(meals[choice - 1].getId())) {
+                     std::cout << u8"餐单已删除！" << std::endl;
+                 } else {
+                     std::cout << u8"删除失败！" << std::endl;
+                 }
+             }
+         }
+     }
+
+     void editMealFromHistory() {
+         auto meals = db.getMealsByUser(getCurrentUser().getId());
+         
+         if (meals.empty()) {
+             std::cout << u8"\n暂无餐单可编辑。" << std::endl;
+             return;
+         }
+
+         std::cout << u8"\n=== 编辑餐单 ===" << std::endl;
+         
+         for (size_t i = 0; i < meals.size(); ++i) {
+             std::cout << (i + 1) << ". ";
+             std::cout << u8"[" << meals[i].getDate() << u8"] " 
+                       << meals[i].getMealType() << std::endl;
+         }
+
+         int choice = Utils::getIntInput(u8"\n选择要编辑的餐单 (0取消): ");
+         
+         if (choice > 0 && choice <= static_cast<int>(meals.size())) {
+             Meal selectedMeal = meals[choice - 1];
+             selectedMeal.displayMeal();
+             
+             std::cout << u8"\n编辑选项:" << std::endl;
+             std::cout << u8"1. 添加食物" << std::endl;
+             std::cout << u8"2. 移除食物" << std::endl;
+             std::cout << u8"3. 替换食物" << std::endl;
+             std::cout << u8"0. 取消" << std::endl;
+             
+             int editChoice = Utils::getIntInput(u8"选择 (0-3): ");
+             
+             switch (editChoice) {
+                 case 1: {
+                     auto allFoods = db.getAllFoods();
+                     std::cout << u8"\n可用食物列表:" << std::endl;
+                     for (size_t i = 0; i < allFoods.size(); ++i) {
+                         std::cout << (i + 1) << ". " << allFoods[i].getName() 
+                                   << u8" - " << allFoods[i].getCalories() << u8" kcal" << std::endl;
+                     }
+                     
+                     int foodChoice = Utils::getIntInput(u8"选择要添加的食物 (0取消): ");
+                     if (foodChoice > 0 && foodChoice <= static_cast<int>(allFoods.size())) {
+                         selectedMeal.addFood(allFoods[foodChoice - 1]);
+                         if (db.updateMeal(selectedMeal)) {
+                             std::cout << u8"食物已添加！" << std::endl;
+                         }
+                     }
+                     break;
+                 }
+                 case 2: {
+                     auto foods = selectedMeal.getFoods();
+                     if (foods.empty()) {
+                         std::cout << u8"餐单中没有食物。" << std::endl;
+                         break;
+                     }
+                     
+                     std::cout << u8"\n餐单中的食物:" << std::endl;
+                     for (size_t i = 0; i < foods.size(); ++i) {
+                         std::cout << (i + 1) << ". " << foods[i].getName() << std::endl;
+                     }
+                     
+                     int foodChoice = Utils::getIntInput(u8"选择要移除的食物 (0取消): ");
+                     if (foodChoice > 0 && foodChoice <= static_cast<int>(foods.size())) {
+                         selectedMeal.removeFood(foods[foodChoice - 1].getId());
+                         if (db.updateMeal(selectedMeal)) {
+                             std::cout << u8"食物已移除！" << std::endl;
+                         }
+                     }
+                     break;
+                 }
+                 case 3: {
+                     auto foods = selectedMeal.getFoods();
+                     if (foods.empty()) {
+                         std::cout << u8"餐单中没有食物。" << std::endl;
+                         break;
+                     }
+                     
+                     std::cout << u8"\n餐单中的食物:" << std::endl;
+                     for (size_t i = 0; i < foods.size(); ++i) {
+                         std::cout << (i + 1) << ". " << foods[i].getName() << std::endl;
+                     }
+                     
+                     int oldFoodChoice = Utils::getIntInput(u8"选择要替换的食物 (0取消): ");
+                     if (oldFoodChoice > 0 && oldFoodChoice <= static_cast<int>(foods.size())) {
+                         auto alternatives = engine.getAlternativeFoods(foods[oldFoodChoice - 1], getCurrentUser(), 5);
+                         
+                         if (alternatives.empty()) {
+                             std::cout << u8"没有找到合适的替代食物。" << std::endl;
+                             break;
+                         }
+                         
+                         std::cout << u8"\n推荐的替代食物:" << std::endl;
+                         for (size_t i = 0; i < alternatives.size(); ++i) {
+                             std::cout << (i + 1) << ". " << alternatives[i].getName() 
+                                       << u8" - " << alternatives[i].getCalories() << u8" kcal" << std::endl;
+                         }
+                         
+                         int newFoodChoice = Utils::getIntInput(u8"选择新食物 (0取消): ");
+                         if (newFoodChoice > 0 && newFoodChoice <= static_cast<int>(alternatives.size())) {
+                             selectedMeal.removeFood(foods[oldFoodChoice - 1].getId());
+                             selectedMeal.addFood(alternatives[newFoodChoice - 1]);
+                             if (db.updateMeal(selectedMeal)) {
+                                 std::cout << u8"食物已替换！" << std::endl;
+                             }
+                         }
+                     }
+                     break;
+                 }
+             }
+         }
+     }
+
+     void compareWithGoals() {
+         std::string date = Utils::getStringInput(u8"请输入日期 (格式: YYYY-MM-DD, 留空查看所有): ");
+         
+         auto meals = db.getMealsByUser(getCurrentUser().getId());
+         
+         if (date.empty()) {
+             std::cout << u8"\n=== 营养目标对比分析 (全部历史) ===" << std::endl;
+             
+             double totalCal = 0, totalProt = 0, totalCarb = 0, totalFat = 0;
+             int dayCount = 0;
+             std::set<std::string> uniqueDates;
+             
+             for (const auto& meal : meals) {
+                 uniqueDates.insert(meal.getDate());
+                 totalCal += meal.getTotalCalories();
+                 totalProt += meal.getTotalProtein();
+                 totalCarb += meal.getTotalCarbs();
+                 totalFat += meal.getTotalFat();
+             }
+             
+             dayCount = uniqueDates.size();
+             if (dayCount == 0) {
+                 std::cout << u8"暂无数据。" << std::endl;
+                 return;
+             }
+             
+             double avgCal = totalCal / dayCount;
+             double avgProt = totalProt / dayCount;
+             double avgCarb = totalCarb / dayCount;
+             double avgFat = totalFat / dayCount;
+             
+             std::cout << u8"\n记录天数: " << dayCount << std::endl;
+             std::cout << u8"\n平均每日摄入 vs 目标:" << std::endl;
+             displayGoalComparison(u8"热量", avgCal, getCurrentUser().getDailyCalorieGoal(), u8"kcal");
+             displayGoalComparison(u8"蛋白质", avgProt, getCurrentUser().getDailyProteinGoal(), u8"g");
+             displayGoalComparison(u8"碳水化合物", avgCarb, getCurrentUser().getDailyCarbGoal(), u8"g");
+             displayGoalComparison(u8"脂肪", avgFat, getCurrentUser().getDailyFatGoal(), u8"g");
+         } else {
+             std::cout << u8"\n=== 营养目标对比分析 (" << date << u8") ===" << std::endl;
+             
+             double totalCal = 0, totalProt = 0, totalCarb = 0, totalFat = 0;
+             bool found = false;
+             
+             for (const auto& meal : meals) {
+                 if (meal.getDate() == date) {
+                     found = true;
+                     totalCal += meal.getTotalCalories();
+                     totalProt += meal.getTotalProtein();
+                     totalCarb += meal.getTotalCarbs();
+                     totalFat += meal.getTotalFat();
+                 }
+             }
+             
+             if (!found) {
+                 std::cout << u8"该日期没有餐单记录。" << std::endl;
+                 return;
+             }
+             
+             std::cout << u8"\n当日摄入 vs 目标:" << std::endl;
+             displayGoalComparison(u8"热量", totalCal, getCurrentUser().getDailyCalorieGoal(), u8"kcal");
+             displayGoalComparison(u8"蛋白质", totalProt, getCurrentUser().getDailyProteinGoal(), u8"g");
+             displayGoalComparison(u8"碳水化合物", totalCarb, getCurrentUser().getDailyCarbGoal(), u8"g");
+             displayGoalComparison(u8"脂肪", totalFat, getCurrentUser().getDailyFatGoal(), u8"g");
+         }
+     }
+
+     void displayGoalComparison(const std::string& nutrient, double actual, double goal, const std::string& unit) {
+         double percentage = (actual / goal) * 100.0;
+         std::cout << std::fixed << std::setprecision(1);
+         std::cout << u8"  " << nutrient << u8": " 
+                   << actual << u8" / " << goal << u8" " << unit
+                   << u8" (" << percentage << u8"%)";
+         
+         if (percentage < 90) {
+             std::cout << u8" [未达标]";
+         } else if (percentage > 110) {
+             std::cout << u8" [超标]";
+         } else {
+             std::cout << u8" [良好]";
+         }
+         std::cout << std::endl;
      }
 
     void managePreferences() {
@@ -463,14 +797,17 @@ private:
              }
              case 4: {
                  std::string tag = Utils::getStringInput(u8"请输入要移除的喜欢标签: ");
+                 getCurrentUser().removePreferredTag(tag);
                  break;
              }
              case 5: {
                  std::string tag = Utils::getStringInput(u8"请输入要移除的避免标签: ");
+                 getCurrentUser().removeAvoidedTag(tag);
                  break;
              }
              case 6: {
                  std::string allergen = Utils::getStringInput(u8"请输入要移除的过敏源: ");
+                 getCurrentUser().removeAllergen(allergen);
                  break;
              }
              case 0:

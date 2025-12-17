@@ -1,4 +1,4 @@
-﻿#include "../include/Database.h"
+#include "../include/Database.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -114,9 +114,19 @@ bool Database::loadUsers() {
                 double dailyCarbGoal = std::stod(tokens[10]);
                 double dailyFatGoal = std::stod(tokens[11]);
                 
-                auto preferredTags = parseTagString(tokens[12]);
-                auto avoidedTags = parseTagString(tokens[13]);
-                auto allergens = parseTagString(tokens[14]);
+                std::set<std::string> preferredTags;
+                std::set<std::string> avoidedTags;
+                std::set<std::string> allergens;
+                
+                if (tokens.size() > 12) {
+                    preferredTags = parseTagString(tokens[12]);
+                }
+                if (tokens.size() > 13) {
+                    avoidedTags = parseTagString(tokens[13]);
+                }
+                if (tokens.size() > 14) {
+                    allergens = parseTagString(tokens[14]);
+                }
                 
                 User user(id, username, password);
                 user.setAge(age);
@@ -198,10 +208,10 @@ bool Database::loadMeals() {
                 int userId = std::stoi(tokens[1]);
                 std::string date = tokens[2];
                 std::string mealType = tokens[3];
-                double totalCalories = std::stod(tokens[4]);
-                double totalProtein = std::stod(tokens[5]);
-                double totalCarbs = std::stod(tokens[6]);
-                double totalFat = std::stod(tokens[7]);
+                (void)std::stod(tokens[4]);  // totalCalories - recalculated from foods
+                (void)std::stod(tokens[5]);  // totalProtein - recalculated from foods
+                (void)std::stod(tokens[6]);  // totalCarbs - recalculated from foods
+                (void)std::stod(tokens[7]);  // totalFat - recalculated from foods
                 bool isRecommended = (tokens[8] == "1");
                 
                 Meal meal(id, userId, date, mealType);
@@ -241,6 +251,26 @@ bool Database::saveMeal(const Meal& meal) {
     
     meals.push_back(meal);
     return saveMeals();
+}
+
+bool Database::updateMeal(const Meal& meal) {
+    for (size_t i = 0; i < meals.size(); ++i) {
+        if (meals[i].getId() == meal.getId()) {
+            meals[i] = meal;
+            return saveMeals();
+        }
+    }
+    return false;
+}
+
+bool Database::deleteMeal(int mealId) {
+    for (size_t i = 0; i < meals.size(); ++i) {
+        if (meals[i].getId() == mealId) {
+            meals.erase(meals.begin() + i);
+            return saveMeals();
+        }
+    }
+    return false;
 }
 
 bool Database::saveMeals() {
@@ -372,6 +402,39 @@ void Database::initializeSampleData() {
     
     foods.push_back(Food(24, u8"核桃", 654, 15.2, 13.7, 65.2, 6.7, {u8"香"}, u8"坚果"));
     foods.push_back(Food(25, u8"花生", 567, 25.8, 16.1, 49.2, 8.5, {u8"香"}, u8"坚果"));
+    
+    foods.push_back(Food(26, u8"糙米饭", 111, 2.6, 23.5, 0.9, 1.8, {u8"清淡"}, u8"主食"));
+    foods.push_back(Food(27, u8"玉米", 86, 3.3, 19.0, 1.2, 2.7, {u8"甜"}, u8"主食"));
+    foods.push_back(Food(28, u8"紫薯", 82, 1.8, 18.7, 0.2, 3.1, {u8"甜"}, u8"主食"));
+    foods.push_back(Food(29, u8"荞麦面", 324, 12.6, 66.5, 2.7, 6.5, {u8"清淡"}, u8"主食"));
+    
+    foods.push_back(Food(30, u8"虾仁", 93, 20.6, 0.6, 0.6, 0.0, {u8"鲜", u8"海鲜"}, u8"肉类"));
+    foods.push_back(Food(31, u8"鱼片", 113, 22.8, 0.0, 2.5, 0.0, {u8"鲜", u8"海鲜"}, u8"肉类"));
+    foods.push_back(Food(32, u8"瘦猪肉", 143, 20.3, 1.3, 6.2, 0.0, {u8"鲜"}, u8"肉类"));
+    
+    foods.push_back(Food(33, u8"芹菜", 16, 0.8, 3.0, 0.2, 1.4, {u8"清淡"}, u8"蔬菜"));
+    foods.push_back(Food(34, u8"黄瓜", 15, 0.7, 3.0, 0.2, 0.5, {u8"清淡"}, u8"蔬菜"));
+    foods.push_back(Food(35, u8"青椒", 22, 1.0, 4.9, 0.2, 1.7, {u8"清淡"}, u8"蔬菜"));
+    foods.push_back(Food(36, u8"蘑菇", 22, 3.1, 3.3, 0.3, 1.0, {u8"鲜"}, u8"蔬菜"));
+    foods.push_back(Food(37, u8"白菜", 17, 1.5, 3.2, 0.2, 0.8, {u8"清淡"}, u8"蔬菜"));
+    foods.push_back(Food(38, u8"茄子", 21, 1.1, 4.9, 0.2, 1.3, {u8"清淡"}, u8"蔬菜"));
+    
+    foods.push_back(Food(39, u8"豆腐干", 140, 16.2, 4.8, 3.6, 1.9, {u8"咸"}, u8"豆制品"));
+    foods.push_back(Food(40, u8"黑豆", 341, 35.0, 33.6, 15.9, 15.5, {u8"清淡"}, u8"豆制品"));
+    
+    foods.push_back(Food(41, u8"猕猴桃", 61, 1.1, 14.5, 0.5, 2.6, {u8"酸", u8"甜"}, u8"水果"));
+    foods.push_back(Food(42, u8"草莓", 32, 0.7, 7.7, 0.3, 2.0, {u8"甜"}, u8"水果"));
+    foods.push_back(Food(43, u8"蓝莓", 57, 0.7, 14.5, 0.3, 2.4, {u8"甜", u8"酸"}, u8"水果"));
+    foods.push_back(Food(44, u8"西瓜", 30, 0.6, 7.6, 0.2, 0.4, {u8"甜"}, u8"水果"));
+    
+    foods.push_back(Food(45, u8"杏仁", 579, 21.2, 21.7, 49.9, 11.8, {u8"香"}, u8"坚果"));
+    foods.push_back(Food(46, u8"腰果", 553, 18.2, 30.2, 43.9, 3.3, {u8"香"}, u8"坚果"));
+    
+    foods.push_back(Food(47, u8"希腊酸奶", 97, 10.2, 3.9, 4.8, 0.0, {u8"酸", u8"甜"}, u8"奶制品"));
+    foods.push_back(Food(48, u8"低脂牛奶", 35, 3.6, 5.0, 0.1, 0.0, {u8"清淡"}, u8"奶制品"));
+    
+    foods.push_back(Food(49, u8"鹌鹑蛋", 158, 13.1, 0.6, 11.6, 0.0, {u8"清淡"}, u8"蛋类"));
+    foods.push_back(Food(50, u8"松花蛋", 171, 13.7, 4.9, 10.7, 0.0, {u8"咸"}, u8"蛋类"));
     
     saveFoods();
 }

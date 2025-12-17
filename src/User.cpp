@@ -27,6 +27,18 @@ void User::addAllergen(const std::string& allergen) {
     allergens.insert(allergen);
 }
 
+void User::removePreferredTag(const std::string& tag) {
+    preferredTags.erase(tag);
+}
+
+void User::removeAvoidedTag(const std::string& tag) {
+    avoidedTags.erase(tag);
+}
+
+void User::removeAllergen(const std::string& allergen) {
+    allergens.erase(allergen);
+}
+
 void User::calculateNutritionGoals() {
     double bmr;
     if (gender == "male" || gender == u8"男") {

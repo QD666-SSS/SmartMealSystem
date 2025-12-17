@@ -1,4 +1,4 @@
-﻿#ifndef DATABASE_H
+#ifndef DATABASE_H
 #define DATABASE_H
 
 #include "User.h"
@@ -38,6 +38,8 @@ public:
     bool saveUser(const User& user);
     bool updateUser(const User& user);
     bool saveMeal(const Meal& meal);
+    bool deleteMeal(int mealId);
+    bool updateMeal(const Meal& meal);
     
     std::vector<User> getAllUsers() const;
     std::vector<Food> getAllFoods() const;
