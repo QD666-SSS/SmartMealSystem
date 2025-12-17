@@ -314,9 +314,12 @@ function displayHistory(meals) {
             
             return `
                 <div style="margin-bottom: 30px;">
-                    <h3 style="color: #333; margin-bottom: 15px; font-size: 20px;">📅 ${date}</h3>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 15px;">
+                        <h3 style="color: #333; margin-bottom: 0; font-size: 20px;">📅 ${date}</h3>
+                        <button class="btn-danger btn-danger-small delete-day-btn" data-date="${date}">删除当日餐单</button>
+                    </div>
                     <div style="display: grid; gap: 15px;">
-                        ${dateMeals.map(meal => createMealCard(meal)).join('')}
+                        ${dateMeals.map(meal => createMealCard(meal, true)).join('')}
                     </div>
                     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 15px; color: white; margin-top: 15px;">
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; text-align: center;">
@@ -343,19 +346,56 @@ function displayHistory(meals) {
                 </div>
             `;
         }).join('');
+
+    grid.querySelectorAll('.delete-meal-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const mealId = btn.dataset.mealId;
+            if (!mealId) return;
+
+            if (!confirm('确定要删除这条餐单记录吗？')) return;
+
+            const result = await apiCall(`/api/meals/${mealId}`, { method: 'DELETE' });
+            if (result) {
+                showToast(result.message || '删除成功！');
+                loadHistory();
+            }
+        });
+    });
+
+    grid.querySelectorAll('.delete-day-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const date = btn.dataset.date;
+            if (!date) return;
+
+            if (!confirm(`确定要删除 ${date} 的全部餐单吗？`)) return;
+
+            const result = await apiCall(`/api/meals/date/${encodeURIComponent(date)}`, { method: 'DELETE' });
+            if (result) {
+                showToast(result.message || '删除成功！');
+                loadHistory();
+            }
+        });
+    });
 }
 
-function createMealCard(meal) {
+function createMealCard(meal, allowDelete = false) {
     const mealTypeNames = {
         'breakfast': '早餐 🌅',
         'lunch': '午餐 ☀️',
         'dinner': '晚餐 🌙'
     };
-    
+
     return `
         <div class="meal-card">
             <div class="meal-header">
                 <div class="meal-type">${mealTypeNames[meal.mealType] || meal.mealType}</div>
+                ${allowDelete ? `<button class="btn-danger btn-danger-small delete-meal-btn" data-meal-id="${meal.id}">删除</button>` : ''}
             </div>
             <div class="meal-nutrition">
                 <div class="nutrition-item">
@@ -419,8 +459,8 @@ function displayRecommendation(meals, date) {
         <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 30px; border-radius: 20px; color: white; margin-bottom: 25px; text-align: center;">
             <h3 style="font-size: 24px; margin-bottom: 10px;">✨ 为您精心推荐</h3>
             <p style="opacity: 0.9; margin-bottom: 20px;">${date} 的营养配餐方案</p>
-            <button id="saveRecommendBtn" class="btn-primary" style="background: white; color: #43e97b; max-width: 200px; margin: 0 auto;">
-                💾 保存此推荐
+            <button id="saveRecommendBtn" class="btn-primary" style="background: white; color: #43e97b; max-width: 220px; margin: 0 auto;">
+                💾 保存/替换此推荐
             </button>
         </div>
         
@@ -462,7 +502,7 @@ function displayRecommendation(meals, date) {
         });
         
         if (result) {
-            showToast('推荐已保存到历史记录！');
+            showToast(result.message || '推荐已保存到历史记录！');
         }
     });
 }

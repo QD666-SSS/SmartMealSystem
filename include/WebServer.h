@@ -28,6 +28,8 @@ private:
     double parseJsonDouble(const std::string& json, const std::string& key);
     std::string urlDecode(const std::string& str);
 
+    void reloadEngineHistory();
+
 public:
     WebServer(int port = 8000, const std::string& wwwRoot = "www");
     void start();

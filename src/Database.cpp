@@ -273,6 +273,26 @@ bool Database::deleteMeal(int mealId) {
     return false;
 }
 
+bool Database::deleteMealsByUserAndDate(int userId, const std::string& date, bool recommendedOnly) {
+    size_t oldSize = meals.size();
+
+    meals.erase(
+        std::remove_if(meals.begin(), meals.end(),
+            [&](const Meal& meal) {
+                if (meal.getUserId() != userId) return false;
+                if (meal.getDate() != date) return false;
+                if (recommendedOnly && !meal.getIsRecommended()) return false;
+                return true;
+            }),
+        meals.end());
+
+    if (meals.size() == oldSize) {
+        return true;
+    }
+
+    return saveMeals();
+}
+
 bool Database::saveMeals() {
     std::ofstream file(mealsFile);
     if (!file.is_open()) {
@@ -332,6 +352,15 @@ std::optional<User> Database::getUserById(int id) const {
     for (const auto& user : users) {
         if (user.getId() == id) {
             return user;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<Meal> Database::getMealById(int id) const {
+    for (const auto& meal : meals) {
+        if (meal.getId() == id) {
+            return meal;
         }
     }
     return std::nullopt;

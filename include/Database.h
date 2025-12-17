@@ -39,6 +39,7 @@ public:
     bool updateUser(const User& user);
     bool saveMeal(const Meal& meal);
     bool deleteMeal(int mealId);
+    bool deleteMealsByUserAndDate(int userId, const std::string& date, bool recommendedOnly = false);
     bool updateMeal(const Meal& meal);
     
     std::vector<User> getAllUsers() const;
@@ -50,6 +51,7 @@ public:
     
     std::optional<Food> getFoodById(int id) const;
     std::optional<User> getUserById(int id) const;
+    std::optional<Meal> getMealById(int id) const;
     
     int getNextUserId() const;
     int getNextFoodId() const;

@@ -208,6 +208,35 @@ body {
     transform: translateY(0);
 }
 
+.btn-danger {
+    width: auto;
+    padding: 12px 18px;
+    border: none;
+    background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(245, 87, 108, 0.35);
+}
+
+.btn-danger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(245, 87, 108, 0.5);
+}
+
+.btn-danger:active {
+    transform: translateY(0);
+}
+
+.btn-danger-small {
+    padding: 8px 12px;
+    font-size: 12px;
+    border-radius: 8px;
+}
+
 .navbar {
     background: white;
     padding: 15px 30px;
