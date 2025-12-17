@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能配餐推荐系统</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-animation"></div>
+    
+    <!-- 登录/注册页面 -->
+    <div id="authPage" class="page active">
+        <div class="container">
+            <div class="auth-box">
+                <div class="logo">
+                    <div class="logo-icon">🍽️</div>
+                    <h1>智能配餐推荐系统</h1>
+                    <p class="subtitle">Intelligent Meal Recommendation System</p>
+                </div>
+                
+                <div class="tabs">
+                    <button class="tab active" data-tab="login">登录</button>
+                    <button class="tab" data-tab="register">注册</button>
+                </div>
+                
+                <!-- 登录表单 -->
+                <form id="loginForm" class="auth-form active">
+                    <div class="form-group">
+                        <label>用户名</label>
+                        <input type="text" id="loginUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label>密码</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit" class="btn-primary">登录</button>
+                </form>
+                
+                <!-- 注册表单 -->
+                <form id="registerForm" class="auth-form">
+                    <div class="form-group">
+                        <label>用户名</label>
+                        <input type="text" id="regUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label>密码</label>
+                        <input type="password" id="regPassword" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>年龄</label>
+                            <input type="number" id="regAge" required>
+                        </div>
+                        <div class="form-group">
+                            <label>性别</label>
+                            <select id="regGender" required>
+                                <option value="male">男</option>
+                                <option value="female">女</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>体重 (kg)</label>
+                            <input type="number" step="0.1" id="regWeight" required>
+                        </div>
+                        <div class="form-group">
+                            <label>身高 (cm)</label>
+                            <input type="number" step="0.1" id="regHeight" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>活动水平</label>
+                        <select id="regActivity" required>
+                            <option value="sedentary">久坐 (很少运动)</option>
+                            <option value="light">轻度活动 (1-3天/周)</option>
+                            <option value="moderate">中度活动 (3-5天/周)</option>
+                            <option value="active">高强度活动 (6-7天/周)</option>
+                            <option value="very_active">极高强度 (每天高强度)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary">注册</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 主界面 -->
+    <div id="mainPage" class="page">
+        <nav class="navbar">
+            <div class="nav-brand">
+                <span class="nav-icon">🍽️</span>
+                <span class="nav-title">智能配餐系统</span>
+            </div>
+            <div class="nav-user">
+                <span id="navUsername">用户</span>
+                <button id="logoutBtn" class="btn-logout">退出</button>
+            </div>
+        </nav>
+        
+        <div class="main-content">
+            <aside class="sidebar">
+                <button class="menu-item active" data-view="dashboard">
+                    <span class="menu-icon">📊</span>
+                    <span>仪表盘</span>
+                </button>
+                <button class="menu-item" data-view="profile">
+                    <span class="menu-icon">👤</span>
+                    <span>个人信息</span>
+                </button>
+                <button class="menu-item" data-view="recommend">
+                    <span class="menu-icon">✨</span>
+                    <span>智能推荐</span>
+                </button>
+                <button class="menu-item" data-view="history">
+                    <span class="menu-icon">📜</span>
+                    <span>历史餐单</span>
+                </button>
+                <button class="menu-item" data-view="foods">
+                    <span class="menu-icon">🥗</span>
+                    <span>食物库</span>
+                </button>
+            </aside>
+            
+            <main class="content">
+                <!-- 仪表盘 -->
+                <div id="dashboardView" class="view active">
+                    <h2>欢迎回来！</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">🎯</div>
+                            <div class="stat-info">
+                                <div class="stat-label">每日热量目标</div>
+                                <div class="stat-value" id="statCalories">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">💪</div>
+                            <div class="stat-info">
+                                <div class="stat-label">蛋白质目标</div>
+                                <div class="stat-value" id="statProtein">0g</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">🍚</div>
+                            <div class="stat-info">
+                                <div class="stat-label">碳水化合物目标</div>
+                                <div class="stat-value" id="statCarbs">0g</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">🥑</div>
+                            <div class="stat-info">
+                                <div class="stat-label">脂肪目标</div>
+                                <div class="stat-value" id="statFat">0g</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="quick-actions">
+                        <h3>快速操作</h3>
+                        <div class="action-buttons">
+                            <button class="action-btn" data-action="recommend">
+                                <span class="action-icon">✨</span>
+                                <span class="action-text">生成今日推荐</span>
+                            </button>
+                            <button class="action-btn" data-action="history">
+                                <span class="action-icon">📜</span>
+                                <span class="action-text">查看历史记录</span>
+                            </button>
+                            <button class="action-btn" data-action="foods">
+                                <span class="action-icon">🥗</span>
+                                <span class="action-text">浏览食物库</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 个人信息 -->
+                <div id="profileView" class="view">
+                    <h2>个人信息</h2>
+                    <div class="profile-card">
+                        <form id="profileForm">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>年龄</label>
+                                    <input type="number" id="profileAge">
+                                </div>
+                                <div class="form-group">
+                                    <label>性别</label>
+                                    <select id="profileGender">
+                                        <option value="male">男</option>
+                                        <option value="female">女</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>体重 (kg)</label>
+                                    <input type="number" step="0.1" id="profileWeight">
+                                </div>
+                                <div class="form-group">
+                                    <label>身高 (cm)</label>
+                                    <input type="number" step="0.1" id="profileHeight">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>活动水平</label>
+                                <select id="profileActivity">
+                                    <option value="sedentary">久坐 (很少运动)</option>
+                                    <option value="light">轻度活动 (1-3天/周)</option>
+                                    <option value="moderate">中度活动 (3-5天/周)</option>
+                                    <option value="active">高强度活动 (6-7天/周)</option>
+                                    <option value="very_active">极高强度 (每天高强度)</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn-primary">保存更改</button>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- 智能推荐 -->
+                <div id="recommendView" class="view">
+                    <h2>智能推荐</h2>
+                    <div class="recommend-header">
+                        <div class="form-group">
+                            <label>选择日期</label>
+                            <input type="date" id="recommendDate">
+                        </div>
+                        <button id="generateBtn" class="btn-primary">生成推荐</button>
+                    </div>
+                    <div id="recommendResults" class="meals-grid"></div>
+                </div>
+                
+                <!-- 历史餐单 -->
+                <div id="historyView" class="view">
+                    <h2>历史餐单</h2>
+                    <div id="historyResults" class="meals-grid"></div>
+                </div>
+                
+                <!-- 食物库 -->
+                <div id="foodsView" class="view">
+                    <h2>食物数据库</h2>
+                    <div class="foods-header">
+                        <input type="text" id="foodSearch" class="search-input" placeholder="搜索食物...">
+                        <select id="categoryFilter" class="filter-select">
+                            <option value="">所有类别</option>
+                        </select>
+                    </div>
+                    <div id="foodsGrid" class="foods-grid"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Toast 通知 -->
+    <div id="toast" class="toast"></div>
+    
+    <!-- Loading 遮罩 -->
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
