@@ -95,6 +95,47 @@ docker run --rm -v meal_data:/data -v $(pwd):/backup ubuntu bash -c "cd / && tar
 
 请确保在运行 `docker run` 时加上了 `-it` 参数，或在 `docker-compose.yml` 中配置了 `stdin_open: true` 和 `tty: true`（我们已经默认配置好了）。
 
-### 3. 数据丢失
+## Windows 本地部署 (Visual Studio) 🪟
 
-请确保运行时使用了 Volume 挂载（Docker Compose 默认已配置）。如果您直接使用 `docker run` 而没有 `-v` 参数，容器重启后数据将会重置。
+如果您希望在 Windows 上获得最佳的本地体验，或需要分发给其他 Windows 用户，请按照以下步骤操作。
+
+### 1. 环境准备
+
+- 操作系统：Windows 10/11
+- 编译器：[Visual Studio 2022](https://visualstudio.microsoft.com/zh-hans/vs/) (需安装 "使用 C++ 的桌面开发" 工作负载)
+- 构建工具：CMake (Visual Studio 通常已内置)
+
+### 2. 一键编译与发布
+
+我们提供了批处理脚本来简化编译和打包过程。
+
+1. **编译项目**
+   双击运行项目根目录下的 `build.bat`。
+   - 这将自动检测 VS2022，配置项目并进行 Release 模式编译。
+   - 编译完成后，可执行文件位于 `build/bin/Release/`。
+
+2. **打包发布 (推荐)**
+   双击运行 `deploy_windows.bat`。
+   - 此脚本会检查编译状态（如果未编译会自动编译）。
+   - 创建一个独立的 `dist/MealRecommendationSystem_v2.0` 文件夹。
+   - 包含可执行文件、必要的文档和 `启动系统.bat`。
+   - **您可以直接将此文件夹压缩并发送给用户，无需安装任何开发环境即可运行。**
+
+### 3. 手动编译
+
+如果您更喜欢使用命令行：
+
+```cmd
+mkdir build
+cd build
+cmake .. -G "Visual Studio 17 2022" -A x64
+cmake --build . --config Release
+```
+
+### 4. 常见问题 (Windows)
+
+**Q: 中文显示乱码？**
+A: 我们的启动脚本 (`run.bat` 和 `启动系统.bat`) 已经内置了 `chcp 65001` 命令来切换控制台到 UTF-8 模式。请务必通过这些脚本启动，而不是直接双击 exe 文件。
+
+**Q: 杀毒软件误报？**
+A: 由于是未签名的自制软件，某些杀毒软件可能会提示风险。请将其添加到信任列表。

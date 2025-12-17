@@ -62,7 +62,7 @@ private:
          Utils::clearScreen();
          std::cout << u8"============================================" << std::endl;
          std::cout << u8"                                      " << std::endl;
-         std::cout << u8"          智能配餐推荐系统 v1.0             " << std::endl;
+         std::cout << u8"          智能配餐推荐系统 v2.0             " << std::endl;
          std::cout << u8"                                      " << std::endl;
          std::cout << u8"     Intelligent Meal Recommendation System " << std::endl;
          std::cout << u8"                                      " << std::endl;

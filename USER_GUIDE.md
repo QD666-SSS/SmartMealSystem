@@ -2,13 +2,11 @@
 
 ## 快速开始
 
-### 编译和运行
-```bash
-# 编译项目
-./build.sh
+详细的安装和部署步骤（包括 Docker 和 Windows 本地运行）请参考 [部署指南](DEPLOYMENT.md)。
 
-# 运行程序
-./build/bin/MealRecommendationSystem
+### 简易运行 (Docker)
+```bash
+docker-compose run --rm meal-system
 ```
 
 ---

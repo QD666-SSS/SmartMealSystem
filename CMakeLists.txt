@@ -15,6 +15,11 @@ set(SOURCES
     src/Utils.cpp
 )
 
+# 添加资源文件 (Windows)
+if(WIN32)
+    list(APPEND SOURCES resources/version.rc)
+endif()
+
 # 设置头文件
 set(HEADERS
     include/User.h
