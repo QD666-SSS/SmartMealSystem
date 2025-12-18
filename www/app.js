@@ -226,7 +226,7 @@ document.getElementById('profileForm').addEventListener('submit', async (e) => {
     
     if (result && result.data) {
         currentUser = result.data;
-        showToast('个人信息更新成功！');
+        showToast('✅ 个人信息更新成功！');
         updateDashboard();
         
         await savePreferences();
@@ -259,6 +259,11 @@ function displayTagButtons(containerId, fieldId, selectedTags) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
     
+    if (availableTags.length === 0) {
+        container.innerHTML = '<span style="color: #999; font-size: 12px;">正在加载标签...</span>';
+        return;
+    }
+    
     for (const tag of availableTags) {
         const isSelected = selectedTags.includes(tag);
         const button = document.createElement('button');
@@ -266,16 +271,34 @@ function displayTagButtons(containerId, fieldId, selectedTags) {
         button.className = `tag-button ${isSelected ? 'selected' : ''}`;
         button.textContent = tag;
         button.style.cssText = `
-            padding: 6px 12px;
-            border: 2px solid #ddd;
+            padding: 8px 16px;
+            border: 2px solid ${isSelected ? '#667eea' : '#ddd'};
             border-radius: 20px;
             background: ${isSelected ? '#667eea' : 'white'};
             color: ${isSelected ? 'white' : '#333'};
             cursor: pointer;
-            transition: all 0.2s;
-            font-size: 13px;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            font-weight: ${isSelected ? '600' : '400'};
             white-space: nowrap;
+            box-shadow: ${isSelected ? '0 2px 8px rgba(102, 126, 234, 0.3)' : '0 1px 3px rgba(0,0,0,0.1)'};
         `;
+        
+        button.addEventListener('mouseenter', () => {
+            if (!button.classList.contains('selected')) {
+                button.style.borderColor = '#667eea';
+                button.style.transform = 'translateY(-1px)';
+                button.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)';
+            }
+        });
+        
+        button.addEventListener('mouseleave', () => {
+            if (!button.classList.contains('selected')) {
+                button.style.borderColor = '#ddd';
+                button.style.transform = 'translateY(0)';
+                button.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+            }
+        });
         
         button.addEventListener('click', (e) => {
             e.preventDefault();
@@ -284,10 +307,14 @@ function displayTagButtons(containerId, fieldId, selectedTags) {
                 button.style.background = '#667eea';
                 button.style.color = 'white';
                 button.style.borderColor = '#667eea';
+                button.style.fontWeight = '600';
+                button.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)';
             } else {
                 button.style.background = 'white';
                 button.style.color = '#333';
                 button.style.borderColor = '#ddd';
+                button.style.fontWeight = '400';
+                button.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
             }
         });
         
@@ -317,7 +344,10 @@ async function savePreferences() {
     
     if (result && result.data) {
         currentUser = result.data;
-        showToast('口味偏好保存成功！');
+        const prefCount = preferredTags.length;
+        const avoidCount = avoidedTags.length;
+        const allergenCount = allergens.length;
+        showToast(`✅ 口味偏好已保存！喜欢: ${prefCount}项，避免: ${avoidCount}项，过敏源: ${allergenCount}项`);
     }
 }
 
