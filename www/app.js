@@ -198,6 +198,7 @@ async function loadProfile() {
     document.getElementById('profileGender').value = currentUser.gender;
     document.getElementById('profileActivity').value = currentUser.activityLevel;
     
+    // 确保加载食物数据
     if (allFoods.length === 0) {
         const result = await apiCall('/api/foods');
         if (result && result.data) {
@@ -205,7 +206,13 @@ async function loadProfile() {
         }
     }
     
+    // 显示标签选择UI
     extractAndDisplayAvailableTags();
+    
+    // 延迟显示标签按钮，确保数据已加载
+    setTimeout(() => {
+        displayTagSelectionUI();
+    }, 100);
 }
 
 document.getElementById('profileForm').addEventListener('submit', async (e) => {
@@ -250,6 +257,10 @@ function extractAndDisplayAvailableTags() {
 }
 
 function displayTagSelectionUI() {
+    if (!availableTags || availableTags.length === 0) {
+        return;
+    }
+    
     displayTagButtons('preferredTagsContainer', 'preferredTags', currentUser.preferredTags || []);
     displayTagButtons('avoidedTagsContainer', 'avoidedTags', currentUser.avoidedTags || []);
     displayTagButtons('allergensContainer', 'allergens', currentUser.allergens || []);
@@ -257,12 +268,16 @@ function displayTagSelectionUI() {
 
 function displayTagButtons(containerId, fieldId, selectedTags) {
     const container = document.getElementById(containerId);
+    console.log(`显示 ${containerId} 标签，已选择:`, selectedTags);
+    
     container.innerHTML = '';
     
-    if (availableTags.length === 0) {
-        container.innerHTML = '<span style="color: #999; font-size: 12px;">正在加载标签...</span>';
+    if (!availableTags || availableTags.length === 0) {
+        container.innerHTML = '<span style="color: #999; font-size: 12px; padding: 10px;">暂无标签数据，请刷新页面重试</span>';
         return;
     }
+    
+    console.log(`为 ${containerId} 显示 ${availableTags.length} 个标签`);
     
     for (const tag of availableTags) {
         const isSelected = selectedTags.includes(tag);
@@ -270,6 +285,7 @@ function displayTagButtons(containerId, fieldId, selectedTags) {
         button.type = 'button';
         button.className = `tag-button ${isSelected ? 'selected' : ''}`;
         button.textContent = tag;
+        button.dataset.tag = tag; // 添加标签数据
         button.style.cssText = `
             padding: 8px 16px;
             border: 2px solid ${isSelected ? '#667eea' : '#ddd'};
@@ -282,6 +298,7 @@ function displayTagButtons(containerId, fieldId, selectedTags) {
             font-weight: ${isSelected ? '600' : '400'};
             white-space: nowrap;
             box-shadow: ${isSelected ? '0 2px 8px rgba(102, 126, 234, 0.3)' : '0 1px 3px rgba(0,0,0,0.1)'};
+            margin: 4px;
         `;
         
         button.addEventListener('mouseenter', () => {
@@ -302,6 +319,7 @@ function displayTagButtons(containerId, fieldId, selectedTags) {
         
         button.addEventListener('click', (e) => {
             e.preventDefault();
+            console.log(`点击标签: ${tag}`);
             button.classList.toggle('selected');
             if (button.classList.contains('selected')) {
                 button.style.background = '#667eea';
@@ -323,9 +341,17 @@ function displayTagButtons(containerId, fieldId, selectedTags) {
 }
 
 async function savePreferences() {
+    console.log('开始保存偏好设置...');
+    
     const preferredButtons = document.querySelectorAll('#preferredTagsContainer .selected');
     const avoidedButtons = document.querySelectorAll('#avoidedTagsContainer .selected');
     const allergenButtons = document.querySelectorAll('#allergensContainer .selected');
+    
+    console.log('找到的已选择标签:', {
+        preferred: preferredButtons.length,
+        avoided: avoidedButtons.length,
+        allergens: allergenButtons.length
+    });
     
     const preferredTags = Array.from(preferredButtons).map(btn => btn.textContent);
     const avoidedTags = Array.from(avoidedButtons).map(btn => btn.textContent);
@@ -336,6 +362,8 @@ async function savePreferences() {
         avoidedTags: avoidedTags,
         allergens: allergens
     };
+    
+    console.log('准备保存的数据:', preferencesData);
     
     const result = await apiCall('/api/user/preferences', {
         method: 'PUT',
@@ -348,6 +376,9 @@ async function savePreferences() {
         const avoidCount = avoidedTags.length;
         const allergenCount = allergens.length;
         showToast(`✅ 口味偏好已保存！喜欢: ${prefCount}项，避免: ${avoidCount}项，过敏源: ${allergenCount}项`);
+        console.log('偏好设置保存成功');
+    } else {
+        console.error('偏好设置保存失败:', result);
     }
 }
 
