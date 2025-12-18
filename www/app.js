@@ -1,6 +1,8 @@
 const API_BASE = '';
 let authToken = localStorage.getItem('authToken');
 let currentUser = null;
+let availableTags = [];
+let allFoods = [];
 
 const showLoading = () => document.getElementById('loading').classList.add('show');
 const hideLoading = () => document.getElementById('loading').classList.remove('show');
@@ -189,12 +191,21 @@ async function loadViewData(viewName) {
     }
 }
 
-function loadProfile() {
+async function loadProfile() {
     document.getElementById('profileAge').value = currentUser.age;
     document.getElementById('profileWeight').value = currentUser.weight;
     document.getElementById('profileHeight').value = currentUser.height;
     document.getElementById('profileGender').value = currentUser.gender;
     document.getElementById('profileActivity').value = currentUser.activityLevel;
+    
+    if (allFoods.length === 0) {
+        const result = await apiCall('/api/foods');
+        if (result && result.data) {
+            allFoods = result.data;
+        }
+    }
+    
+    extractAndDisplayAvailableTags();
 }
 
 document.getElementById('profileForm').addEventListener('submit', async (e) => {
@@ -217,8 +228,98 @@ document.getElementById('profileForm').addEventListener('submit', async (e) => {
         currentUser = result.data;
         showToast('个人信息更新成功！');
         updateDashboard();
+        
+        await savePreferences();
     }
 });
+
+function extractAndDisplayAvailableTags() {
+    if (!allFoods || allFoods.length === 0) return;
+    
+    const tagsSet = new Set();
+    for (const food of allFoods) {
+        if (food.tags && Array.isArray(food.tags)) {
+            for (const tag of food.tags) {
+                tagsSet.add(tag);
+            }
+        }
+    }
+    availableTags = Array.from(tagsSet).sort();
+    
+    displayTagSelectionUI();
+}
+
+function displayTagSelectionUI() {
+    displayTagButtons('preferredTagsContainer', 'preferredTags', currentUser.preferredTags || []);
+    displayTagButtons('avoidedTagsContainer', 'avoidedTags', currentUser.avoidedTags || []);
+    displayTagButtons('allergensContainer', 'allergens', currentUser.allergens || []);
+}
+
+function displayTagButtons(containerId, fieldId, selectedTags) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    
+    for (const tag of availableTags) {
+        const isSelected = selectedTags.includes(tag);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `tag-button ${isSelected ? 'selected' : ''}`;
+        button.textContent = tag;
+        button.style.cssText = `
+            padding: 6px 12px;
+            border: 2px solid #ddd;
+            border-radius: 20px;
+            background: ${isSelected ? '#667eea' : 'white'};
+            color: ${isSelected ? 'white' : '#333'};
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+            white-space: nowrap;
+        `;
+        
+        button.addEventListener('click', (e) => {
+            e.preventDefault();
+            button.classList.toggle('selected');
+            if (button.classList.contains('selected')) {
+                button.style.background = '#667eea';
+                button.style.color = 'white';
+                button.style.borderColor = '#667eea';
+            } else {
+                button.style.background = 'white';
+                button.style.color = '#333';
+                button.style.borderColor = '#ddd';
+            }
+        });
+        
+        container.appendChild(button);
+    }
+}
+
+async function savePreferences() {
+    const preferredButtons = document.querySelectorAll('#preferredTagsContainer .selected');
+    const avoidedButtons = document.querySelectorAll('#avoidedTagsContainer .selected');
+    const allergenButtons = document.querySelectorAll('#allergensContainer .selected');
+    
+    const preferredTags = Array.from(preferredButtons).map(btn => btn.textContent);
+    const avoidedTags = Array.from(avoidedButtons).map(btn => btn.textContent);
+    const allergens = Array.from(allergenButtons).map(btn => btn.textContent);
+    
+    const preferencesData = {
+        preferredTags: preferredTags,
+        avoidedTags: avoidedTags,
+        allergens: allergens
+    };
+    
+    const result = await apiCall('/api/user/preferences', {
+        method: 'PUT',
+        body: JSON.stringify(preferencesData)
+    });
+    
+    if (result && result.data) {
+        currentUser = result.data;
+        showToast('口味偏好保存成功！');
+    }
+}
 
 async function loadFoods() {
     const result = await apiCall('/api/foods');

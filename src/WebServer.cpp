@@ -136,6 +136,36 @@ double WebServer::parseJsonDouble(const std::string& json, const std::string& ke
     return 0.0;
 }
 
+std::vector<std::string> WebServer::parseJsonArray(const std::string& json, const std::string& key) {
+    std::vector<std::string> result;
+    std::string searchKey = "\"" + key + "\"";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) return result;
+    
+    pos = json.find("[", pos);
+    if (pos == std::string::npos) return result;
+    pos++;
+    
+    size_t endPos = json.find("]", pos);
+    if (endPos == std::string::npos) return result;
+    
+    std::string arrayContent = json.substr(pos, endPos - pos);
+    
+    size_t current = 0;
+    while (current < arrayContent.length()) {
+        size_t openQuote = arrayContent.find("\"", current);
+        if (openQuote == std::string::npos) break;
+        
+        size_t closeQuote = arrayContent.find("\"", openQuote + 1);
+        if (closeQuote == std::string::npos) break;
+        
+        result.push_back(arrayContent.substr(openQuote + 1, closeQuote - openQuote - 1));
+        current = closeQuote + 1;
+    }
+    
+    return result;
+}
+
 std::string WebServer::userToJson(const User& user) {
     std::stringstream ss;
     ss << std::fixed << std::setprecision(1);
@@ -150,8 +180,35 @@ std::string WebServer::userToJson(const User& user) {
        << "\"dailyCalorieGoal\":" << user.getDailyCalorieGoal() << ","
        << "\"dailyProteinGoal\":" << user.getDailyProteinGoal() << ","
        << "\"dailyCarbsGoal\":" << user.getDailyCarbGoal() << ","
-       << "\"dailyFatGoal\":" << user.getDailyFatGoal()
-       << "}";
+       << "\"dailyFatGoal\":" << user.getDailyFatGoal() << ","
+       << "\"preferredTags\":[";
+    
+    const auto& preferredTags = user.getPreferredTags();
+    bool first = true;
+    for (const auto& tag : preferredTags) {
+        if (!first) ss << ",";
+        ss << "\"" << tag << "\"";
+        first = false;
+    }
+    ss << "],\"avoidedTags\":[";
+    
+    const auto& avoidedTags = user.getAvoidedTags();
+    first = true;
+    for (const auto& tag : avoidedTags) {
+        if (!first) ss << ",";
+        ss << "\"" << tag << "\"";
+        first = false;
+    }
+    ss << "],\"allergens\":[";
+    
+    const auto& allergens = user.getAllergens();
+    first = true;
+    for (const auto& allergen : allergens) {
+        if (!first) ss << ",";
+        ss << "\"" << allergen << "\"";
+        first = false;
+    }
+    ss << "]}";
     return ss.str();
 }
 
@@ -353,6 +410,49 @@ void WebServer::start() {
         db.updateUser(user);
         
         res.set_content(createJsonResponse(true, u8"更新成功", userToJson(user)), "application/json; charset=utf-8");
+    });
+    
+    svr.Put("/api/user/preferences", [this](const httplib::Request& req, httplib::Response& res) {
+        std::string token = req.get_header_value("Authorization");
+        if (token.find("Bearer ") == 0) {
+            token = token.substr(7);
+        }
+        
+        if (sessions.find(token) == sessions.end()) {
+            res.set_content(createJsonResponse(false, u8"未登录或会话已过期"), "application/json; charset=utf-8");
+            return;
+        }
+        
+        User& user = sessions[token];
+        
+        auto preferredTags = parseJsonArray(req.body, "preferredTags");
+        auto avoidedTags = parseJsonArray(req.body, "avoidedTags");
+        auto allergens = parseJsonArray(req.body, "allergens");
+        
+        user.clearPreferredTags();
+        for (const auto& tag : preferredTags) {
+            if (!tag.empty()) {
+                user.addPreferredTag(tag);
+            }
+        }
+        
+        user.clearAvoidedTags();
+        for (const auto& tag : avoidedTags) {
+            if (!tag.empty()) {
+                user.addAvoidedTag(tag);
+            }
+        }
+        
+        user.clearAllergens();
+        for (const auto& allergen : allergens) {
+            if (!allergen.empty()) {
+                user.addAllergen(allergen);
+            }
+        }
+        
+        db.updateUser(user);
+        
+        res.set_content(createJsonResponse(true, u8"偏好设置更新成功", userToJson(user)), "application/json; charset=utf-8");
     });
     
     svr.Get("/api/foods", [this](const httplib::Request& req, httplib::Response& res) {

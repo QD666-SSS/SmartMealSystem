@@ -26,6 +26,7 @@ private:
     std::string parseJsonString(const std::string& json, const std::string& key);
     int parseJsonInt(const std::string& json, const std::string& key);
     double parseJsonDouble(const std::string& json, const std::string& key);
+    std::vector<std::string> parseJsonArray(const std::string& json, const std::string& key);
     std::string urlDecode(const std::string& str);
     void reloadEngineHistory();
 
