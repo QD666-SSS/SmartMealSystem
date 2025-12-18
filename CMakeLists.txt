@@ -20,16 +20,35 @@ set(SOURCES
     src/WebServer.cpp
 )
 
-# 创建可执行文件
+# 测试源文件
+set(TEST_SOURCES
+    tests/whitebox_tests.cpp
+    src/User.cpp
+    src/Food.cpp
+    src/Meal.cpp
+    src/Database.cpp
+    src/RecommendationEngine.cpp
+    src/Utils.cpp
+)
+
+# 创建主程序可执行文件
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# Linux/Unix平台需要链接pthread
+# 创建测试可执行文件
+add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES})
+
+# Linux/Unix平台需要链接pthread和math库
 if(UNIX AND NOT APPLE)
-    target_link_libraries(${PROJECT_NAME} pthread)
+    target_link_libraries(${PROJECT_NAME} pthread m)
+    target_link_libraries(${PROJECT_NAME}_tests pthread m)
 endif()
 
 # 设置输出目录
 set_target_properties(${PROJECT_NAME} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
+set_target_properties(${PROJECT_NAME}_tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
