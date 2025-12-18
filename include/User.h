@@ -67,6 +67,9 @@ public:
     void removePreferredTag(const std::string& tag);
     void removeAvoidedTag(const std::string& tag);
     void removeAllergen(const std::string& allergen);
+    void clearPreferredTags() { preferredTags.clear(); }
+    void clearAvoidedTags() { avoidedTags.clear(); }
+    void clearAllergens() { allergens.clear(); }
     
     void calculateNutritionGoals();
     void displayProfile() const;

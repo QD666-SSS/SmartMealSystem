@@ -215,6 +215,27 @@
                                     <option value="very_active">极高强度 (每天高强度)</option>
                                 </select>
                             </div>
+                            <div style="border-top: 2px solid #f0f0f0; margin-top: 20px; padding-top: 20px;">
+                                <h3 style="margin-top: 0; color: #333;">口味偏好</h3>
+                                <div class="form-group">
+                                    <label>喜欢的口味标签</label>
+                                    <div id="preferredTagsContainer" class="tags-container" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+                                        <input type="hidden" id="preferredTags">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>避免的口味标签</label>
+                                    <div id="avoidedTagsContainer" class="tags-container" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+                                        <input type="hidden" id="avoidedTags">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>过敏源</label>
+                                    <div id="allergensContainer" class="tags-container" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+                                        <input type="hidden" id="allergens">
+                                    </div>
+                                </div>
+                            </div>
                             <button type="submit" class="btn-primary">保存更改</button>
                         </form>
                     </div>
